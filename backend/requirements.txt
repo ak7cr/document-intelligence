@@ -2,3 +2,6 @@ Flask
 Flask-SQLAlchemy
 pgvector
 python-dotenv
+
+flask-cors
+psycopg2-binary
