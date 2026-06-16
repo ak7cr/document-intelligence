@@ -7,7 +7,7 @@ services:
     environment:
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: adminpassword
-      POSTGRES_DB: doc_rag
+      POSTGRES_DB: tender_rag
     ports:
       - "5432:5432"
     volumes:
