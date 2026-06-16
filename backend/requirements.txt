@@ -10,3 +10,6 @@ python-docx
 openpyxl
 pandas
 xlrd
+paddlepaddle
+paddleocr
+Pillow

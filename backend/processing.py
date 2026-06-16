@@ -40,6 +40,7 @@ def _do_process(doc_id: str) -> None:
             existing.word_count = result.word_count
             existing.page_count = result.page_count
             existing.method = result.method
+            existing.ocr_confidence = result.confidence
         else:
             db.session.add(
                 DocumentText(
@@ -48,6 +49,7 @@ def _do_process(doc_id: str) -> None:
                     word_count=result.word_count,
                     page_count=result.page_count,
                     method=result.method,
+                    ocr_confidence=result.confidence,
                 )
             )
 

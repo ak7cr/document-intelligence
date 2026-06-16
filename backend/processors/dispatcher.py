@@ -1,6 +1,7 @@
 from .base import ProcessingResult
 from .csv_processor import extract_csv
 from .docx_processor import extract_docx
+from .image_processor import extract_image
 from .pdf_processor import extract_pdf
 from .xlsx_processor import extract_excel
 
@@ -17,6 +18,5 @@ def dispatch(filetype: str, data: bytes) -> ProcessingResult:
     if filetype == "csv":
         return extract_csv(data)
     if filetype in _IMAGE_TYPES:
-        # OCR pipeline added in Stage 6
-        return ProcessingResult(text="", method="ocr_pending", page_count=1)
+        return extract_image(data)
     raise ValueError(f"Unsupported filetype: {filetype}")

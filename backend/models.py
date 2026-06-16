@@ -83,6 +83,7 @@ class DocumentText(db.Model):
     page_count = db.Column(db.Integer, nullable=True)
     word_count = db.Column(db.Integer, nullable=False, default=0)
     method = db.Column(db.String(50), default="direct")  # 'direct' | 'ocr' | 'ocr_pending'
+    ocr_confidence = db.Column(db.Float, nullable=True)  # 0.0–1.0, None for direct
     extracted_at = db.Column(db.DateTime, default=_now)
 
     def to_dict(self) -> dict:
