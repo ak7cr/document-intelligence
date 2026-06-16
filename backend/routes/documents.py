@@ -3,7 +3,7 @@ import uuid
 from flask import Blueprint, jsonify, request
 from werkzeug.utils import secure_filename
 
-from models import Document, DocumentText, Session, db
+from models import Document, DocumentChunk, DocumentText, Session, db
 from processing import trigger_processing
 from storage import DOCUMENT_BUCKET, delete_file, get_presigned_url, upload_file
 from storage.minio_client import CONTENT_TYPES
@@ -97,6 +97,26 @@ def get_document_text(doc_id: str):
         "method": doc_text.method,
         "ocr_confidence": doc_text.ocr_confidence,
         "extracted_at": doc_text.extracted_at.isoformat(),
+    }), 200
+
+
+@documents_bp.route("/documents/<doc_id>/chunks", methods=["GET"])
+def get_document_chunks(doc_id: str):
+    doc = Document.query.get(doc_id)
+    if not doc:
+        return jsonify({"error": "Document not found"}), 404
+    if doc.status != "ready":
+        return jsonify({"error": "Document not ready", "status": doc.status}), 409
+    chunks = (
+        DocumentChunk.query
+        .filter_by(document_id=doc_id)
+        .order_by(DocumentChunk.chunk_index)
+        .all()
+    )
+    return jsonify({
+        "document_id": doc_id,
+        "chunk_count": len(chunks),
+        "chunks": [c.to_dict() for c in chunks],
     }), 200
 
 

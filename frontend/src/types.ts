@@ -16,4 +16,13 @@ export interface Document {
   uploaded_at: string
   word_count: number | null
   page_count: number | null
+  chunk_count: number
+}
+
+export interface DocumentChunk {
+  id: string
+  document_id: string
+  chunk_index: number
+  text: string
+  token_count: number
 }

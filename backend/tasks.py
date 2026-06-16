@@ -3,7 +3,8 @@
 import logging
 
 from celery_app import celery
-from models import Document, DocumentText, db
+from chunker import chunk_text
+from models import Document, DocumentChunk, DocumentText, db
 from processors import dispatch
 from storage.minio_client import get_client
 
@@ -59,12 +60,24 @@ def _process(task, doc_id: str) -> None:
                 )
             )
 
+        # ── Chunk text ───────────────────────────────────────────────────
+        raw_chunks = chunk_text(result.text)
+        DocumentChunk.query.filter_by(document_id=doc_id).delete()
+        for ch in raw_chunks:
+            db.session.add(DocumentChunk(
+                document_id=doc_id,
+                chunk_index=ch.index,
+                text=ch.text,
+                token_count=ch.token_count,
+            ))
+
         doc.status = "ready"
         db.session.commit()
         logger.info(
-            "Document %s ready — %d words, method=%s, confidence=%s",
+            "Document %s ready — %d words, %d chunks, method=%s, confidence=%s",
             doc_id,
             result.word_count,
+            len(raw_chunks),
             result.method,
             f"{result.confidence:.2f}" if result.confidence else "n/a",
         )

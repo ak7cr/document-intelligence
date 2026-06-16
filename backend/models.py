@@ -49,6 +49,13 @@ class Document(db.Model):
         uselist=False,
         cascade="all, delete-orphan",
     )
+    chunks = db.relationship(
+        "DocumentChunk",
+        backref="document",
+        lazy=True,
+        cascade="all, delete-orphan",
+        order_by="DocumentChunk.chunk_index",
+    )
 
     def to_dict(self) -> dict:
         data: dict = {
@@ -62,6 +69,7 @@ class Document(db.Model):
             "uploaded_at": self.uploaded_at.isoformat(),
             "word_count": None,
             "page_count": None,
+            "chunk_count": len(self.chunks),
         }
         if self.text:
             data["word_count"] = self.text.word_count
@@ -93,4 +101,33 @@ class DocumentText(db.Model):
             "page_count": self.page_count,
             "method": self.method,
             "extracted_at": self.extracted_at.isoformat(),
+        }
+
+
+class DocumentChunk(db.Model):
+    __tablename__ = "document_chunks"
+
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    document_id = db.Column(
+        db.String(36),
+        db.ForeignKey("documents.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    chunk_index = db.Column(db.Integer, nullable=False)
+    text = db.Column(db.Text, nullable=False)
+    token_count = db.Column(db.Integer, nullable=False, default=0)
+    created_at = db.Column(db.DateTime, default=_now)
+
+    __table_args__ = (
+        db.Index("ix_chunks_doc", "document_id"),
+        db.UniqueConstraint("document_id", "chunk_index", name="uq_chunk"),
+    )
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "document_id": self.document_id,
+            "chunk_index": self.chunk_index,
+            "text": self.text,
+            "token_count": self.token_count,
         }

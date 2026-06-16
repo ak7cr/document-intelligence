@@ -133,6 +133,7 @@ function DocRow({ doc, onDelete }: { doc: Document; onDelete: () => void }) {
             <span className="text-xs text-gray-400">
               · {doc.word_count.toLocaleString()} words
               {doc.page_count != null ? ` · ${doc.page_count}p` : ''}
+              {doc.chunk_count > 0 ? ` · ${doc.chunk_count} chunks` : ''}
             </span>
           )}
         </div>
