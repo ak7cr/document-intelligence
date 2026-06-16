@@ -14,4 +14,6 @@ export interface Document {
   object_key: string | null
   status: 'uploaded' | 'processing' | 'ready' | 'failed'
   uploaded_at: string
+  word_count: number | null
+  page_count: number | null
 }

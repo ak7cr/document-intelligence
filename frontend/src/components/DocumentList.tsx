@@ -26,6 +26,8 @@ const STATUS_STYLE: Record<string, string> = {
   failed:     'bg-red-100 text-red-600',
 }
 
+const IN_PROGRESS = new Set(['uploaded', 'processing'])
+
 interface Props {
   sessionId: string
 }
@@ -36,6 +38,11 @@ export default function DocumentList({ sessionId }: Props) {
   const { data: docs = [], isLoading } = useQuery({
     queryKey: ['documents', sessionId],
     queryFn: () => fetchDocuments(sessionId),
+    // Poll every 2s while any document is still being processed
+    refetchInterval: (query) => {
+      const list = query.state.data ?? []
+      return list.some((d) => IN_PROGRESS.has(d.status)) ? 2000 : false
+    },
   })
 
   const deleteMut = useMutation({
@@ -88,6 +95,7 @@ function DocRow({ doc, onDelete }: { doc: Document; onDelete: () => void }) {
     label: doc.filetype.slice(0, 3).toUpperCase(),
   }
   const statusStyle = STATUS_STYLE[doc.status] ?? STATUS_STYLE.uploaded
+  const isProcessing = IN_PROGRESS.has(doc.status)
 
   async function handleDownload() {
     setDownloading(true)
@@ -113,17 +121,30 @@ function DocRow({ doc, onDelete }: { doc: Document; onDelete: () => void }) {
         <p className="text-sm font-medium text-gray-900 truncate" title={doc.filename}>
           {doc.filename}
         </p>
-        <p className="text-xs text-gray-400 mt-0.5">
-          {new Date(doc.uploaded_at).toLocaleDateString('en-IN', {
-            day: 'numeric',
-            month: 'short',
-            year: 'numeric',
-          })}
-        </p>
+        <div className="flex items-center gap-2 mt-0.5">
+          <p className="text-xs text-gray-400">
+            {new Date(doc.uploaded_at).toLocaleDateString('en-IN', {
+              day: 'numeric',
+              month: 'short',
+              year: 'numeric',
+            })}
+          </p>
+          {doc.word_count != null && (
+            <span className="text-xs text-gray-400">
+              · {doc.word_count.toLocaleString()} words
+              {doc.page_count != null ? ` · ${doc.page_count}p` : ''}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Status */}
-      <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium shrink-0 ${statusStyle}`}>
+      <span
+        className={`flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full font-medium shrink-0 ${statusStyle}`}
+      >
+        {isProcessing && (
+          <span className="w-2 h-2 rounded-full bg-current animate-pulse inline-block" />
+        )}
         {doc.status}
       </span>
 

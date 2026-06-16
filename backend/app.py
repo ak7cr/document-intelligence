@@ -7,7 +7,8 @@ from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
 from sqlalchemy import text
 
-from models import db, Session, Document
+from models import db, Session, Document, DocumentText
+from processing import trigger_processing
 from storage import upload_file, get_presigned_url, delete_file, DOCUMENT_BUCKET
 from storage.minio_client import CONTENT_TYPES
 
@@ -117,6 +118,7 @@ def create_app():
         )
         db.session.add(doc)
         db.session.commit()
+        trigger_processing(doc.id)
         return jsonify(doc.to_dict()), 201
 
     @app.route("/api/documents/<session_id>", methods=["GET"])
@@ -135,6 +137,23 @@ def create_app():
             return jsonify({"error": "Document has no storage reference"}), 400
         url = get_presigned_url(doc.bucket, doc.object_key, expires_hours=1)
         return jsonify({"url": url}), 200
+
+    @app.route("/api/documents/<doc_id>/text", methods=["GET"])
+    def get_document_text(doc_id):
+        doc = Document.query.get(doc_id)
+        if not doc:
+            return jsonify({"error": "Document not found"}), 404
+        doc_text = DocumentText.query.filter_by(document_id=doc_id).first()
+        if not doc_text:
+            return jsonify({"error": "Text not yet extracted", "status": doc.status}), 404
+        return jsonify({
+            "document_id": doc_id,
+            "text": doc_text.raw_text,
+            "word_count": doc_text.word_count,
+            "page_count": doc_text.page_count,
+            "method": doc_text.method,
+            "extracted_at": doc_text.extracted_at.isoformat(),
+        }), 200
 
     @app.route("/api/documents/<doc_id>", methods=["DELETE"])
     def delete_document(doc_id):

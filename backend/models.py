@@ -1,6 +1,10 @@
-from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
+
+def _now() -> datetime:
+    return datetime.now(timezone.utc)
+
+from flask_sqlalchemy import SQLAlchemy
 
 db = SQLAlchemy()
 
@@ -11,13 +15,13 @@ class Session(db.Model):
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     name = db.Column(db.String(150), nullable=False)
     description = db.Column(db.Text, nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=_now)
 
     documents = db.relationship(
         "Document", backref="session", lazy=True, cascade="all, delete-orphan"
     )
 
-    def to_dict(self):
+    def to_dict(self) -> dict:
         return {
             "id": self.id,
             "name": self.name,
@@ -33,16 +37,21 @@ class Document(db.Model):
     session_id = db.Column(db.String(36), db.ForeignKey("sessions.id"), nullable=False)
     filename = db.Column(db.String(255), nullable=False)
     filetype = db.Column(db.String(50), nullable=False)
-    # MinIO storage fields
     bucket = db.Column(db.String(100), nullable=True)
     object_key = db.Column(db.String(512), nullable=True)
-    # Legacy local path (kept for backward compat, mirrors object_key when in MinIO)
     filepath = db.Column(db.String(512), nullable=True)
     status = db.Column(db.String(50), default="uploaded")
-    uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
+    uploaded_at = db.Column(db.DateTime, default=_now)
 
-    def to_dict(self):
-        return {
+    text = db.relationship(
+        "DocumentText",
+        backref="document",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+
+    def to_dict(self) -> dict:
+        data: dict = {
             "id": self.id,
             "session_id": self.session_id,
             "filename": self.filename,
@@ -51,4 +60,36 @@ class Document(db.Model):
             "object_key": self.object_key,
             "status": self.status,
             "uploaded_at": self.uploaded_at.isoformat(),
+            "word_count": None,
+            "page_count": None,
+        }
+        if self.text:
+            data["word_count"] = self.text.word_count
+            data["page_count"] = self.text.page_count
+        return data
+
+
+class DocumentText(db.Model):
+    __tablename__ = "document_text"
+
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    document_id = db.Column(
+        db.String(36),
+        db.ForeignKey("documents.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
+    raw_text = db.Column(db.Text, nullable=False, default="")
+    page_count = db.Column(db.Integer, nullable=True)
+    word_count = db.Column(db.Integer, nullable=False, default=0)
+    method = db.Column(db.String(50), default="direct")  # 'direct' | 'ocr' | 'ocr_pending'
+    extracted_at = db.Column(db.DateTime, default=_now)
+
+    def to_dict(self) -> dict:
+        return {
+            "document_id": self.document_id,
+            "word_count": self.word_count,
+            "page_count": self.page_count,
+            "method": self.method,
+            "extracted_at": self.extracted_at.isoformat(),
         }
