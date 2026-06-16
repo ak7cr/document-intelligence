@@ -139,13 +139,13 @@ export default function App() {
               <p className="text-gray-500 mb-4">
                 {uploading
                   ? 'Uploading...'
-                  : 'Drag and drop tender documents here (PDF, Excel, CSV)'}
+                  : 'Drag and drop tender documents here (PDF, Word, Excel, PowerPoint, CSV, Images)'}
               </p>
               <input
                 type="file"
                 className="hidden"
                 id="file-upload"
-                accept=".pdf,.xlsx,.xls,.csv"
+                accept=".pdf,.docx,.doc,.pptx,.ppt,.xlsx,.xls,.csv,.png,.jpg,.jpeg,.tiff,.tif"
                 onChange={handleFileUpload}
                 disabled={uploading}
               />
