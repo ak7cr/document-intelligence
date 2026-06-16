@@ -29,15 +29,10 @@ def create_app():
 
     db.init_app(app)
 
-    with app.app_context():
-        db.create_all()
-        _run_migrations()
-
     def allowed_file(filename: str) -> bool:
         return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
-    def _run_migrations():
-        """Add new columns to existing tables without dropping data."""
+    def run_migrations() -> None:
         with db.engine.connect() as conn:
             for col, definition in [
                 ("bucket", "VARCHAR(100)"),
@@ -47,6 +42,10 @@ def create_app():
                     f"ALTER TABLE documents ADD COLUMN IF NOT EXISTS {col} {definition}"
                 ))
             conn.commit()
+
+    with app.app_context():
+        db.create_all()
+        run_migrations()
 
     # ── Sessions ────────────────────────────────────────────────────────────
 

@@ -1,187 +1,67 @@
-import { useState, useEffect } from 'react';
-import { apiClient } from './api/client';
-
-interface Session {
-  id: string;
-  name: string;
-}
-
-interface Document {
-  id: string;
-  filename: string;
-  filetype: string;
-  status: string;
-}
+import { useState, useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import Sidebar from './components/Sidebar'
+import UploadZone from './components/UploadZone'
+import DocumentList from './components/DocumentList'
+import { fetchSessions } from './api/sessions'
 
 export default function App() {
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [activeSession, setActiveSession] = useState<string | null>(null);
-  const [newSessionName, setNewSessionName] = useState('');
-  const [documents, setDocuments] = useState<Document[]>([]);
-  const [uploading, setUploading] = useState(false);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
 
+  const { data: sessions = [] } = useQuery({
+    queryKey: ['sessions'],
+    queryFn: fetchSessions,
+  })
+
+  // Auto-select the first session on initial load
   useEffect(() => {
-    fetchSessions();
-  }, []);
-
-  useEffect(() => {
-    if (activeSession) fetchDocuments(activeSession);
-    else setDocuments([]);
-  }, [activeSession]);
-
-  const fetchSessions = async () => {
-    try {
-      const response = await apiClient.get('/sessions');
-      setSessions(response.data);
-      if (response.data.length > 0 && !activeSession) {
-        setActiveSession(response.data[0].id);
-      }
-    } catch (error) {
-      console.error('Failed to fetch sessions', error);
+    if (sessions.length > 0 && activeSessionId === null) {
+      setActiveSessionId(sessions[0].id)
     }
-  };
+  }, [sessions, activeSessionId])
 
-  const fetchDocuments = async (sessionId: string) => {
-    try {
-      const response = await apiClient.get(`/documents/${sessionId}`);
-      setDocuments(response.data);
-    } catch (error) {
-      console.error('Failed to fetch documents', error);
-    }
-  };
-
-  const createSession = async () => {
-    if (!newSessionName.trim()) return;
-    try {
-      const response = await apiClient.post('/sessions', { name: newSessionName });
-      setNewSessionName('');
-      await fetchSessions();
-      setActiveSession(response.data.id);
-    } catch (error) {
-      console.error('Failed to create session', error);
-    }
-  };
-
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !activeSession) return;
-
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('session_id', activeSession);
-
-    setUploading(true);
-    try {
-      await apiClient.post('/documents', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      await fetchDocuments(activeSession);
-    } catch (error) {
-      console.error('Failed to upload document', error);
-    } finally {
-      setUploading(false);
-      e.target.value = '';
-    }
-  };
+  const activeSession = sessions.find((s) => s.id === activeSessionId) ?? null
 
   return (
-    <div className="flex h-screen bg-gray-50 font-sans">
+    <div className="flex h-screen bg-gray-50 overflow-hidden">
+      <Sidebar
+        activeSessionId={activeSessionId}
+        onSessionSelect={setActiveSessionId}
+      />
 
-      {/* Sidebar */}
-      <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
-        <div className="p-4 border-b border-gray-200 bg-gray-100">
-          <h1 className="text-lg font-bold text-gray-800">Tender Analysis</h1>
-        </div>
-
-        <div className="p-4 border-b border-gray-200">
-          <input
-            type="text"
-            placeholder="New Session Name..."
-            className="w-full text-sm border border-gray-300 rounded px-2 py-1 mb-2"
-            value={newSessionName}
-            onChange={(e) => setNewSessionName(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && createSession()}
-          />
-          <button
-            onClick={createSession}
-            className="w-full bg-blue-600 text-white rounded text-sm py-1.5 hover:bg-blue-700 transition"
-          >
-            + Create Session
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-2">
-          {sessions.map((session) => (
-            <button
-              key={session.id}
-              onClick={() => setActiveSession(session.id)}
-              className={`w-full text-left px-3 py-2 rounded mb-1 text-sm ${
-                activeSession === session.id
-                  ? 'bg-blue-50 text-blue-700 font-medium'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              {session.name}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <main className="flex-1 flex flex-col min-w-0">
         {activeSession ? (
-          <div className="p-8 flex flex-col gap-6 h-full overflow-y-auto">
-            <h2 className="text-2xl font-semibold">
-              {sessions.find((s) => s.id === activeSession)?.name}
-            </h2>
-
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-10 text-center bg-white">
-              <p className="text-gray-500 mb-4">
-                {uploading
-                  ? 'Uploading...'
-                  : 'Drag and drop tender documents here (PDF, Word, Excel, PowerPoint, CSV, Images)'}
-              </p>
-              <input
-                type="file"
-                className="hidden"
-                id="file-upload"
-                accept=".pdf,.docx,.doc,.pptx,.ppt,.xlsx,.xls,.csv,.png,.jpg,.jpeg,.tiff,.tif"
-                onChange={handleFileUpload}
-                disabled={uploading}
-              />
-              <label
-                htmlFor="file-upload"
-                className={`cursor-pointer bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-50 transition ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
-              >
-                Browse Files
-              </label>
+          <>
+            {/* Session header */}
+            <div className="bg-white border-b border-gray-200 px-8 py-4 shrink-0">
+              <h1 className="text-lg font-semibold text-gray-900 leading-tight">
+                {activeSession.name}
+              </h1>
+              {activeSession.description && (
+                <p className="text-sm text-gray-500 mt-0.5">{activeSession.description}</p>
+              )}
             </div>
 
-            {documents.length > 0 && (
-              <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-                <div className="px-4 py-3 border-b border-gray-200 text-sm font-medium text-gray-700">
-                  Uploaded Documents ({documents.length})
-                </div>
-                <ul>
-                  {documents.map((doc) => (
-                    <li
-                      key={doc.id}
-                      className="flex items-center justify-between px-4 py-3 border-b border-gray-100 last:border-0 text-sm"
-                    >
-                      <span className="text-gray-800">{doc.filename}</span>
-                      <span className="text-xs text-gray-400 uppercase">{doc.filetype}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
+            {/* Scrollable content */}
+            <div className="flex-1 overflow-y-auto p-8 space-y-6">
+              <UploadZone sessionId={activeSession.id} />
+              <DocumentList sessionId={activeSession.id} />
+            </div>
+          </>
         ) : (
-          <div className="flex-1 flex items-center justify-center text-gray-400">
-            Create or select a session to begin.
+          <div className="flex-1 flex flex-col items-center justify-center text-center px-8 select-none">
+            <div className="w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center text-3xl mb-5">
+              📄
+            </div>
+            <h2 className="text-xl font-semibold text-gray-700 mb-2">
+              Tender Intelligence
+            </h2>
+            <p className="text-sm text-gray-400 max-w-xs leading-relaxed">
+              Create a session from the sidebar, then upload tender documents to begin analysis.
+            </p>
           </div>
         )}
-      </div>
+      </main>
     </div>
-  );
+  )
 }

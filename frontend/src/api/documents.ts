@@ -1,0 +1,26 @@
+import { apiClient } from './client'
+import type { Document } from '../types'
+
+export async function fetchDocuments(sessionId: string): Promise<Document[]> {
+  const res = await apiClient.get<Document[]>(`/documents/${sessionId}`)
+  return res.data
+}
+
+export async function uploadDocument(sessionId: string, file: File): Promise<Document> {
+  const form = new FormData()
+  form.append('file', file)
+  form.append('session_id', sessionId)
+  const res = await apiClient.post<Document>('/documents', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+  return res.data
+}
+
+export async function deleteDocument(id: string): Promise<void> {
+  await apiClient.delete(`/documents/${id}`)
+}
+
+export async function getDocumentUrl(id: string): Promise<string> {
+  const res = await apiClient.get<{ url: string }>(`/documents/${id}/url`)
+  return res.data.url
+}
