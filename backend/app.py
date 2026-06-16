@@ -5,6 +5,7 @@ from flask import Flask
 from flask_cors import CORS
 from sqlalchemy import text
 
+from celery_app import init_celery
 from models import db
 from routes import documents_bp, sessions_bp
 
@@ -17,8 +18,10 @@ def create_app() -> Flask:
 
     app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+    app.config["REDIS_URL"] = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
     db.init_app(app)
+    init_celery(app)
 
     app.register_blueprint(sessions_bp, url_prefix="/api")
     app.register_blueprint(documents_bp, url_prefix="/api")

@@ -13,3 +13,4 @@ xlrd
 paddlepaddle
 paddleocr
 Pillow
+celery[redis]
