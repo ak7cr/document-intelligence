@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { Session } from '../types'
+import type { SearchResult, Session } from '../types'
 
 export async function fetchSessions(): Promise<Session[]> {
   const res = await apiClient.get<Session[]>('/sessions')
@@ -13,4 +13,15 @@ export async function createSession(name: string, description?: string): Promise
 
 export async function deleteSession(id: string): Promise<void> {
   await apiClient.delete(`/sessions/${id}`)
+}
+
+export async function searchSession(
+  sessionId: string,
+  query: string,
+  limit = 5,
+): Promise<{ query: string; results: SearchResult[] }> {
+  const res = await apiClient.get(`/sessions/${sessionId}/search`, {
+    params: { q: query, limit },
+  })
+  return res.data
 }

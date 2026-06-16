@@ -26,3 +26,12 @@ export interface DocumentChunk {
   text: string
   token_count: number
 }
+
+export interface SearchResult {
+  score: number
+  document_id: string
+  chunk_id: string
+  chunk_index: number
+  filename: string
+  text: string
+}
