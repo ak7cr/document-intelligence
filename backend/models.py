@@ -1,5 +1,4 @@
 from flask_sqlalchemy import SQLAlchemy
-from pgvector.sqlalchemy import Vector
 from datetime import datetime
 import uuid
 
@@ -9,11 +8,20 @@ class Session(db.Model):
     __tablename__ = 'sessions'
     
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    name = db.Column(db.String(150), nullable=True) # e.g., "Morgan Stanley Q3 Tender"
+    name = db.Column(db.String(150), nullable=False)
+    description = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
-    # Relationship to documents
+    # Cascade delete ensures deleting a session removes all associated metadata files
     documents = db.relationship('Document', backref='session', lazy=True, cascade="all, delete-orphan")
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "description": self.description,
+            "created_at": self.created_at.isoformat()
+        }
 
 class Document(db.Model):
     __tablename__ = 'documents'
@@ -21,21 +29,18 @@ class Document(db.Model):
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     session_id = db.Column(db.String(36), db.ForeignKey('sessions.id'), nullable=False)
     filename = db.Column(db.String(255), nullable=False)
-    file_type = db.Column(db.String(50), nullable=False) # 'pdf', 'excel', etc.
-    extracted_text = db.Column(db.Text, nullable=True) # The raw, full text for hydration
+    filetype = db.Column(db.String(50), nullable=False)  # 'pdf', 'xlsx', 'csv'
+    filepath = db.Column(db.String(512), nullable=False)  # Physical path on disk/storage
+    status = db.Column(db.String(50), default="uploaded")  # 'uploaded', 'processing', 'completed', 'failed'
     uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    # Relationship to chunks
-    chunks = db.relationship('Chunk', backref='document', lazy=True, cascade="all, delete-orphan")
 
-class Chunk(db.Model):
-    __tablename__ = 'chunks'
-    
-    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    document_id = db.Column(db.String(36), db.ForeignKey('documents.id'), nullable=False)
-    page_number = db.Column(db.Integer, nullable=True) # Useful for referencing the exact page
-    text_content = db.Column(db.Text, nullable=False)
-    
-    # Vector column. The dimension size (e.g., 384 or 1536) depends on your chosen embedding model.
-    # We will use 384 as a placeholder for a lightweight local model like all-MiniLM-L6-v2.
-    embedding = db.Column(Vector(384))
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "session_id": self.session_id,
+            "filename": self.filename,
+            "filetype": self.filetype,
+            "filepath": self.filepath,
+            "status": self.status,
+            "uploaded_at": self.uploaded_at.isoformat()
+        }
