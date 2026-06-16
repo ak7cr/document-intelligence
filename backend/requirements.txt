@@ -14,3 +14,5 @@ paddlepaddle
 paddleocr
 Pillow
 celery[redis]
+sentence-transformers
+qdrant-client

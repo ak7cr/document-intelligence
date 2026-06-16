@@ -2,6 +2,7 @@ from flask import Blueprint, jsonify, request
 
 from models import Session, db
 from storage import delete_file
+from vector import search_chunks
 
 sessions_bp = Blueprint("sessions", __name__)
 
@@ -21,6 +22,18 @@ def create_session():
 def get_sessions():
     sessions = Session.query.order_by(Session.created_at.desc()).all()
     return jsonify([s.to_dict() for s in sessions]), 200
+
+
+@sessions_bp.route("/sessions/<session_id>/search", methods=["GET"])
+def search_session(session_id: str):
+    if not Session.query.get(session_id):
+        return jsonify({"error": "Session not found"}), 404
+    q = request.args.get("q", "").strip()
+    if not q:
+        return jsonify({"error": "Query parameter 'q' is required"}), 400
+    limit = min(int(request.args.get("limit", 5)), 20)
+    results = search_chunks(q, session_id=session_id, top_k=limit)
+    return jsonify({"query": q, "results": results}), 200
 
 
 @sessions_bp.route("/sessions/<session_id>", methods=["DELETE"])

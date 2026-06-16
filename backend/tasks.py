@@ -6,7 +6,9 @@ from celery_app import celery
 from chunker import chunk_text
 from models import Document, DocumentChunk, DocumentText, db
 from processors import dispatch
+from qdrant_client.models import PointStruct
 from storage.minio_client import get_client
+from vector import delete_doc_vectors, embed_passages, upsert_chunks
 
 logger = logging.getLogger(__name__)
 
@@ -63,13 +65,37 @@ def _process(task, doc_id: str) -> None:
         # ── Chunk text ───────────────────────────────────────────────────
         raw_chunks = chunk_text(result.text)
         DocumentChunk.query.filter_by(document_id=doc_id).delete()
+        db_chunks: list[DocumentChunk] = []
         for ch in raw_chunks:
-            db.session.add(DocumentChunk(
+            obj = DocumentChunk(
                 document_id=doc_id,
                 chunk_index=ch.index,
                 text=ch.text,
                 token_count=ch.token_count,
-            ))
+            )
+            db.session.add(obj)
+            db_chunks.append(obj)
+        db.session.flush()  # assign UUIDs before embedding
+
+        # ── Embed and upsert to Qdrant ────────────────────────────────────
+        if db_chunks:
+            vecs = embed_passages([c.text for c in db_chunks])
+            delete_doc_vectors(doc_id)
+            upsert_chunks([
+                PointStruct(
+                    id=c.id,
+                    vector=vecs[i].tolist(),
+                    payload={
+                        "document_id": doc_id,
+                        "chunk_id": c.id,
+                        "chunk_index": c.chunk_index,
+                        "session_id": doc.session_id,
+                        "filename": doc.filename,
+                        "text": c.text,
+                    },
+                )
+                for i, c in enumerate(db_chunks)
+            ])
 
         doc.status = "ready"
         db.session.commit()
@@ -77,7 +103,7 @@ def _process(task, doc_id: str) -> None:
             "Document %s ready — %d words, %d chunks, method=%s, confidence=%s",
             doc_id,
             result.word_count,
-            len(raw_chunks),
+            len(db_chunks),
             result.method,
             f"{result.confidence:.2f}" if result.confidence else "n/a",
         )

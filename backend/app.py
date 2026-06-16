@@ -8,6 +8,7 @@ from sqlalchemy import text
 from celery_app import init_celery
 from models import db
 from routes import documents_bp, sessions_bp
+from vector.store import init_collection as init_qdrant
 
 load_dotenv()
 
@@ -29,6 +30,10 @@ def create_app() -> Flask:
     with app.app_context():
         db.create_all()
         _migrate()
+        try:
+            init_qdrant()
+        except Exception:
+            app.logger.warning("Qdrant unavailable at startup — collection will be created on first use")
 
     return app
 
