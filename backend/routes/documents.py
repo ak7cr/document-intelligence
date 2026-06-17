@@ -3,7 +3,7 @@ import uuid
 from flask import Blueprint, jsonify, request
 from werkzeug.utils import secure_filename
 
-from models import Document, DocumentChunk, DocumentEntity, DocumentText, Session, db
+from models import Document, DocumentChunk, DocumentEntity, DocumentSummary, DocumentText, Session, db
 from processing import trigger_processing
 from storage import DOCUMENT_BUCKET, delete_file, get_presigned_url, upload_file
 from storage.minio_client import CONTENT_TYPES
@@ -118,6 +118,52 @@ def get_document_chunks(doc_id: str):
         "chunk_count": len(chunks),
         "chunks": [c.to_dict() for c in chunks],
     }), 200
+
+
+@documents_bp.route("/documents/<doc_id>/summary", methods=["GET"])
+def get_document_summary(doc_id: str):
+    doc = Document.query.get(doc_id)
+    if not doc:
+        return jsonify({"error": "Document not found"}), 404
+    s = DocumentSummary.query.filter_by(document_id=doc_id).first()
+    if not s:
+        return jsonify({"error": "No summary yet", "status": doc.status}), 404
+    return jsonify(s.to_dict()), 200
+
+
+@documents_bp.route("/documents/<doc_id>/summarize", methods=["POST"])
+def resimmarize_document(doc_id: str):
+    """Re-run summarization on demand (e.g. for docs processed pre-Stage 14)."""
+    doc = Document.query.get(doc_id)
+    if not doc:
+        return jsonify({"error": "Document not found"}), 404
+    if doc.status != "ready":
+        return jsonify({"error": "Document not ready", "status": doc.status}), 409
+    doc_text = DocumentText.query.filter_by(document_id=doc_id).first()
+    if not doc_text:
+        return jsonify({"error": "No extracted text found"}), 404
+
+    try:
+        from summarizer import summarize_document
+        result = summarize_document(doc_text.raw_text)
+        s = DocumentSummary.query.filter_by(document_id=doc_id).first()
+        if s:
+            s.headline = result["headline"]
+            s.summary_text = result["summary_text"]
+            s.key_points = result["key_points"]
+        else:
+            s = DocumentSummary(
+                document_id=doc_id,
+                headline=result["headline"],
+                summary_text=result["summary_text"],
+                key_points=result["key_points"],
+            )
+            db.session.add(s)
+        db.session.commit()
+        return jsonify(s.to_dict()), 200
+    except Exception as exc:
+        db.session.rollback()
+        return jsonify({"error": str(exc)}), 500
 
 
 @documents_bp.route("/documents/<doc_id>/extract", methods=["POST"])

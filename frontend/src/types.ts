@@ -36,6 +36,13 @@ export interface SearchResult {
   text: string
 }
 
+export interface DocumentSummary {
+  document_id: string
+  headline: string
+  summary_text: string
+  key_points: string[]
+}
+
 export interface DocumentEntity {
   id: string
   document_id: string

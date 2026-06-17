@@ -62,6 +62,12 @@ class Document(db.Model):
         lazy=True,
         cascade="all, delete-orphan",
     )
+    summary = db.relationship(
+        "DocumentSummary",
+        backref="document",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
 
     def to_dict(self) -> dict:
         data: dict = {
@@ -136,6 +142,30 @@ class DocumentChunk(db.Model):
             "chunk_index": self.chunk_index,
             "text": self.text,
             "token_count": self.token_count,
+        }
+
+
+class DocumentSummary(db.Model):
+    __tablename__ = "document_summaries"
+
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    document_id = db.Column(
+        db.String(36),
+        db.ForeignKey("documents.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
+    headline = db.Column(db.Text, nullable=False, default="")
+    summary_text = db.Column(db.Text, nullable=False, default="")
+    key_points = db.Column(db.JSON, nullable=False, default=list)
+    created_at = db.Column(db.DateTime, default=_now)
+
+    def to_dict(self) -> dict:
+        return {
+            "document_id": self.document_id,
+            "headline": self.headline,
+            "summary_text": self.summary_text,
+            "key_points": self.key_points or [],
         }
 
 

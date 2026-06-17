@@ -122,6 +122,27 @@ def _process(task, doc_id: str) -> None:
         except Exception:
             logger.exception("Entity extraction failed for document %s — skipping", doc_id)
 
+        # ── Summarise document ────────────────────────────────────────────
+        try:
+            from summarizer import summarize_document
+            from models import DocumentSummary
+            s = summarize_document(result.text)
+            existing_summary = DocumentSummary.query.filter_by(document_id=doc_id).first()
+            if existing_summary:
+                existing_summary.headline = s["headline"]
+                existing_summary.summary_text = s["summary_text"]
+                existing_summary.key_points = s["key_points"]
+            else:
+                db.session.add(DocumentSummary(
+                    document_id=doc_id,
+                    headline=s["headline"],
+                    summary_text=s["summary_text"],
+                    key_points=s["key_points"],
+                ))
+            logger.info("Summary generated for document %s", doc_id)
+        except Exception:
+            logger.exception("Summarization failed for document %s — skipping", doc_id)
+
         doc.status = "ready"
         db.session.commit()
         logger.info(

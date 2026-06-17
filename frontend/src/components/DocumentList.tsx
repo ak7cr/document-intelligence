@@ -1,7 +1,11 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { fetchDocuments, deleteDocument, getDocumentUrl, fetchDocumentEntities, reextractEntities } from '../api/documents'
-import type { Document, DocumentEntity } from '../types'
+import {
+  fetchDocuments, deleteDocument, getDocumentUrl,
+  fetchDocumentEntities, reextractEntities,
+  fetchDocumentSummary, resummarizeDocument,
+} from '../api/documents'
+import type { Document, DocumentEntity, DocumentSummary } from '../types'
 
 const TYPE_STYLE: Record<string, { bg: string; label: string }> = {
   pdf:  { bg: 'bg-red-100 text-red-700',      label: 'PDF' },
@@ -36,6 +40,8 @@ const ENTITY_STYLE: Record<string, string> = {
 }
 
 const IN_PROGRESS = new Set(['uploaded', 'processing'])
+
+type InsightsTab = 'summary' | 'entities'
 
 interface Props {
   sessionId: string
@@ -84,11 +90,7 @@ export default function DocumentList({ sessionId }: Props) {
       </p>
       <div className="space-y-1.5">
         {docs.map((doc) => (
-          <DocRow
-            key={doc.id}
-            doc={doc}
-            onDelete={() => deleteMut.mutate(doc.id)}
-          />
+          <DocRow key={doc.id} doc={doc} onDelete={() => deleteMut.mutate(doc.id)} />
         ))}
       </div>
     </div>
@@ -97,15 +99,28 @@ export default function DocumentList({ sessionId }: Props) {
 
 function DocRow({ doc, onDelete }: { doc: Document; onDelete: () => void }) {
   const [downloading, setDownloading] = useState(false)
-  const [showEntities, setShowEntities] = useState(false)
-
+  const [showInsights, setShowInsights] = useState(false)
+  const [insightsTab, setInsightsTab] = useState<InsightsTab>('summary')
   const qc = useQueryClient()
+
+  const { data: summary, isLoading: summaryLoading, isError: summaryError } = useQuery({
+    queryKey: ['summary', doc.id],
+    queryFn: () => fetchDocumentSummary(doc.id),
+    enabled: showInsights && insightsTab === 'summary' && doc.status === 'ready',
+    staleTime: 10 * 60 * 1000,
+    retry: false,
+  })
 
   const { data: entities = [], isLoading: entitiesLoading } = useQuery({
     queryKey: ['entities', doc.id],
     queryFn: () => fetchDocumentEntities(doc.id),
-    enabled: showEntities && doc.status === 'ready',
+    enabled: showInsights && insightsTab === 'entities' && doc.status === 'ready',
     staleTime: 5 * 60 * 1000,
+  })
+
+  const resummarizeMut = useMutation({
+    mutationFn: () => resummarizeDocument(doc.id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['summary', doc.id] }),
   })
 
   const reextractMut = useMutation({
@@ -134,14 +149,10 @@ function DocRow({ doc, onDelete }: { doc: Document; onDelete: () => void }) {
     <div className="bg-white border border-gray-100 rounded-lg hover:border-gray-200 hover:shadow-sm transition">
       {/* Main row */}
       <div className="group flex items-center gap-3 px-4 py-3">
-        {/* Type badge */}
-        <div
-          className={'shrink-0 w-10 h-10 rounded-lg flex items-center justify-center text-[11px] font-bold ' + typeStyle.bg}
-        >
+        <div className={'shrink-0 w-10 h-10 rounded-lg flex items-center justify-center text-[11px] font-bold ' + typeStyle.bg}>
           {typeStyle.label}
         </div>
 
-        {/* Info */}
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-gray-900 truncate" title={doc.filename}>
             {doc.filename}
@@ -149,9 +160,7 @@ function DocRow({ doc, onDelete }: { doc: Document; onDelete: () => void }) {
           <div className="flex items-center gap-2 mt-0.5">
             <p className="text-xs text-gray-400">
               {new Date(doc.uploaded_at).toLocaleDateString('en-IN', {
-                day: 'numeric',
-                month: 'short',
-                year: 'numeric',
+                day: 'numeric', month: 'short', year: 'numeric',
               })}
             </p>
             {doc.word_count != null && (
@@ -164,23 +173,16 @@ function DocRow({ doc, onDelete }: { doc: Document; onDelete: () => void }) {
           </div>
         </div>
 
-        {/* Status */}
-        <span
-          className={'flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full font-medium shrink-0 ' + statusStyle}
-        >
-          {isProcessing && (
-            <span className="w-2 h-2 rounded-full bg-current animate-pulse inline-block" />
-          )}
+        <span className={'flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full font-medium shrink-0 ' + statusStyle}>
+          {isProcessing && <span className="w-2 h-2 rounded-full bg-current animate-pulse inline-block" />}
           {doc.status}
         </span>
 
-        {/* Insights toggle — only for ready docs */}
         {doc.status === 'ready' && (
           <button
-            onClick={() => setShowEntities((v) => !v)}
-            title="Show extracted entities"
+            onClick={() => setShowInsights((v) => !v)}
             className={'text-[11px] px-2 py-0.5 rounded-full border font-medium shrink-0 transition ' +
-              (showEntities
+              (showInsights
                 ? 'bg-blue-50 text-blue-600 border-blue-200'
                 : 'bg-gray-50 text-gray-400 border-gray-200 hover:text-blue-600 hover:border-blue-200')}
           >
@@ -188,7 +190,6 @@ function DocRow({ doc, onDelete }: { doc: Document; onDelete: () => void }) {
           </button>
         )}
 
-        {/* Actions — visible on hover */}
         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition shrink-0">
           <button
             onClick={handleDownload}
@@ -208,45 +209,158 @@ function DocRow({ doc, onDelete }: { doc: Document; onDelete: () => void }) {
         </div>
       </div>
 
-      {/* Entity panel */}
-      {showEntities && (
-        <div className="border-t border-gray-100 px-4 py-3">
-          {entitiesLoading ? (
-            <div className="flex gap-2">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="h-6 w-24 bg-gray-100 rounded-full animate-pulse" />
-              ))}
-            </div>
-          ) : entities.length === 0 ? (
-            <div className="flex items-center gap-3">
-              <p className="text-[11px] text-gray-400">No entities extracted yet.</p>
+      {/* Insights panel */}
+      {showInsights && (
+        <div className="border-t border-gray-100">
+          {/* Tab bar */}
+          <div className="flex gap-0 border-b border-gray-100 px-4">
+            {(['summary', 'entities'] as InsightsTab[]).map((tab) => (
               <button
-                onClick={() => reextractMut.mutate()}
-                disabled={reextractMut.isPending}
-                className="text-[11px] px-2.5 py-1 bg-blue-50 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-100 transition disabled:opacity-50"
+                key={tab}
+                onClick={() => setInsightsTab(tab)}
+                className={'px-3 py-2 text-[11px] font-medium border-b-2 -mb-px transition capitalize ' +
+                  (insightsTab === tab
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-400 hover:text-gray-600')}
               >
-                {reextractMut.isPending ? 'Extracting...' : 'Run extraction'}
+                {tab === 'summary' ? 'Summary' : 'Entities'}
               </button>
-              {reextractMut.isError && (
-                <span className="text-[11px] text-red-500">Failed — check server logs</span>
-              )}
-            </div>
-          ) : (
-            <EntityPanel entities={entities} />
-          )}
+            ))}
+          </div>
+
+          <div className="px-4 py-3">
+            {insightsTab === 'summary' ? (
+              <SummaryPane
+                summary={summary ?? null}
+                loading={summaryLoading}
+                missing={summaryError}
+                onGenerate={() => resummarizeMut.mutate()}
+                generating={resummarizeMut.isPending}
+                generateError={resummarizeMut.isError}
+              />
+            ) : (
+              <EntitiesPane
+                entities={entities}
+                loading={entitiesLoading}
+                onExtract={() => reextractMut.mutate()}
+                extracting={reextractMut.isPending}
+                extractError={reextractMut.isError}
+              />
+            )}
+          </div>
         </div>
       )}
     </div>
   )
 }
 
-function EntityPanel({ entities }: { entities: DocumentEntity[] }) {
+function SummaryPane({
+  summary, loading, missing, onGenerate, generating, generateError,
+}: {
+  summary: DocumentSummary | null
+  loading: boolean
+  missing: boolean
+  onGenerate: () => void
+  generating: boolean
+  generateError: boolean
+}) {
+  if (loading) {
+    return (
+      <div className="space-y-2 animate-pulse">
+        <div className="h-4 bg-gray-100 rounded w-3/4" />
+        <div className="h-3 bg-gray-100 rounded w-full" />
+        <div className="h-3 bg-gray-100 rounded w-5/6" />
+      </div>
+    )
+  }
+
+  if (missing || !summary || (!summary.headline && !summary.summary_text)) {
+    return (
+      <div className="flex items-center gap-3">
+        <p className="text-[11px] text-gray-400">No summary generated yet.</p>
+        <button
+          onClick={onGenerate}
+          disabled={generating}
+          className="text-[11px] px-2.5 py-1 bg-blue-50 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-100 transition disabled:opacity-50"
+        >
+          {generating ? 'Generating...' : 'Generate summary'}
+        </button>
+        {generateError && <span className="text-[11px] text-red-500">Failed -- check server logs</span>}
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-3">
+      {summary.headline && (
+        <p className="text-sm font-semibold text-gray-800 leading-snug">{summary.headline}</p>
+      )}
+      {summary.summary_text && (
+        <p className="text-xs text-gray-600 leading-relaxed">{summary.summary_text}</p>
+      )}
+      {summary.key_points.length > 0 && (
+        <ul className="space-y-1">
+          {summary.key_points.map((pt, i) => (
+            <li key={i} className="flex items-start gap-2 text-xs text-gray-600">
+              <span className="text-blue-400 shrink-0 mt-0.5">&#8226;</span>
+              <span>{pt}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="flex justify-end">
+        <button
+          onClick={onGenerate}
+          disabled={generating}
+          className="text-[10px] text-gray-300 hover:text-gray-500 transition disabled:opacity-50"
+        >
+          {generating ? 'Regenerating...' : 'Regenerate'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function EntitiesPane({
+  entities, loading, onExtract, extracting, extractError,
+}: {
+  entities: DocumentEntity[]
+  loading: boolean
+  onExtract: () => void
+  extracting: boolean
+  extractError: boolean
+}) {
+  if (loading) {
+    return (
+      <div className="flex gap-2 animate-pulse">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="h-6 w-24 bg-gray-100 rounded-full" />
+        ))}
+      </div>
+    )
+  }
+
+  if (entities.length === 0) {
+    return (
+      <div className="flex items-center gap-3">
+        <p className="text-[11px] text-gray-400">No entities extracted yet.</p>
+        <button
+          onClick={onExtract}
+          disabled={extracting}
+          className="text-[11px] px-2.5 py-1 bg-blue-50 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-100 transition disabled:opacity-50"
+        >
+          {extracting ? 'Extracting...' : 'Run extraction'}
+        </button>
+        {extractError && <span className="text-[11px] text-red-500">Failed -- check server logs</span>}
+      </div>
+    )
+  }
+
   const grouped: Record<string, DocumentEntity[]> = {}
   for (const e of entities) {
     if (!grouped[e.entity_type]) grouped[e.entity_type] = []
     grouped[e.entity_type].push(e)
   }
-
   const ORDER = ['doc_type', 'reference', 'deadline', 'date', 'amount', 'party']
   const types = [...new Set([...ORDER, ...Object.keys(grouped)])].filter((t) => grouped[t])
 
@@ -258,25 +372,22 @@ function EntityPanel({ entities }: { entities: DocumentEntity[] }) {
             {type === 'doc_type' ? 'Type' : type}
           </span>
           <div className="flex flex-wrap gap-1.5 flex-1">
-            {grouped[type].map((e) => (
-              <EntityChip key={e.id} entity={e} />
-            ))}
+            {grouped[type].map((e) => {
+              const style = ENTITY_STYLE[e.entity_type] ?? 'bg-gray-50 text-gray-600 border-gray-200'
+              return (
+                <span
+                  key={e.id}
+                  title={e.label}
+                  className={'inline-flex flex-col border rounded-lg px-2 py-1 text-[11px] ' + style}
+                >
+                  <span className="font-medium leading-tight">{e.value}</span>
+                  <span className="text-[9px] opacity-60 leading-tight">{e.label}</span>
+                </span>
+              )
+            })}
           </div>
         </div>
       ))}
     </div>
-  )
-}
-
-function EntityChip({ entity }: { entity: DocumentEntity }) {
-  const style = ENTITY_STYLE[entity.entity_type] ?? 'bg-gray-50 text-gray-600 border-gray-200'
-  return (
-    <span
-      className={'inline-flex flex-col border rounded-lg px-2 py-1 text-[11px] ' + style}
-      title={entity.label}
-    >
-      <span className="font-medium leading-tight">{entity.value}</span>
-      <span className="text-[9px] opacity-60 leading-tight">{entity.label}</span>
-    </span>
   )
 }
