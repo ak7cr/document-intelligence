@@ -79,7 +79,7 @@ export default function App() {
                       className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs transition"
                       aria-label="Clear search"
                     >
-                      ✕
+                      x
                     </button>
                   )}
                 </div>

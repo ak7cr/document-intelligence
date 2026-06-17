@@ -1,8 +1,7 @@
 import os
 
 from dotenv import load_dotenv
-from flask import Flask
-from flask_cors import CORS
+from flask import Flask, request
 from sqlalchemy import text
 
 from celery_app import init_celery
@@ -12,10 +11,47 @@ from vector.store import init_collection as init_qdrant
 
 load_dotenv()
 
+_ALLOWED_ORIGINS = {"http://localhost:5173", "http://127.0.0.1:5173"}
+
 
 def create_app() -> Flask:
     app = Flask(__name__)
-    CORS(app)
+
+    if os.getenv("CELERY_WORKER") == "1":
+        # Workers hold connections open during slow OCR/embedding; NullPool
+        # creates a fresh connection per statement instead of borrowing from
+        # the shared pool, so tasks can never starve the web process.
+        from sqlalchemy.pool import NullPool
+        app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {"poolclass": NullPool}
+    else:
+        app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+            "pool_size": 10,
+            "max_overflow": 20,
+            "pool_pre_ping": True,   # discard stale connections silently
+        }
+
+    @app.after_request
+    def _cors(response):
+        origin = request.headers.get("Origin", "")
+        if origin in _ALLOWED_ORIGINS:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+            response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+            response.headers["Access-Control-Max-Age"] = "86400"
+        return response
+
+    @app.before_request
+    def _preflight():
+        if request.method == "OPTIONS":
+            from flask import make_response
+            resp = make_response()
+            origin = request.headers.get("Origin", "")
+            if origin in _ALLOWED_ORIGINS:
+                resp.headers["Access-Control-Allow-Origin"] = origin
+                resp.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+                resp.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+                resp.headers["Access-Control-Max-Age"] = "86400"
+            return resp, 200
 
     app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False

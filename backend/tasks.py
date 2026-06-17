@@ -84,7 +84,7 @@ def _process(task, doc_id: str) -> None:
             upsert_chunks([
                 PointStruct(
                     id=c.id,
-                    vector=vecs[i].tolist(),
+                    vector=vecs[i],
                     payload={
                         "document_id": doc_id,
                         "chunk_id": c.id,

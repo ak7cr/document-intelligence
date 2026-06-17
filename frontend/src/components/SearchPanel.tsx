@@ -63,7 +63,7 @@ export default function SearchPanel({ sessionId, query }: Props) {
   return (
     <div>
       <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-2.5">
-        {results.length} result{results.length !== 1 ? 's' : ''} &middot; "{query}"
+        {results.length} result{results.length !== 1 ? 's' : ''} {'·'} "{query}"
       </p>
       <div className="space-y-2">
         {results.map((r) => (
@@ -91,7 +91,7 @@ function scoreBadge(score: number) {
 
 function ResultCard({ result, query }: { result: SearchResult; query: string }) {
   const { pct, cls } = scoreBadge(result.score)
-  const excerpt = result.text.length > 420 ? result.text.slice(0, 420) + '…' : result.text
+  const excerpt = result.text.length > 420 ? result.text.slice(0, 420) + '...' : result.text
 
   return (
     <div className="bg-white border border-gray-100 rounded-xl px-5 py-4 hover:border-gray-200 hover:shadow-sm transition">
@@ -100,7 +100,7 @@ function ResultCard({ result, query }: { result: SearchResult; query: string }) 
           {result.filename}
         </p>
         <span
-          className={`shrink-0 text-[11px] font-bold px-2 py-0.5 rounded-full ${cls}`}
+          className={'shrink-0 text-[11px] font-bold px-2 py-0.5 rounded-full ' + cls}
           title="Similarity score"
         >
           {pct}%
