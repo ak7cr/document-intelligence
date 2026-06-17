@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { fetchDocuments, deleteDocument, getDocumentUrl, fetchDocumentEntities } from '../api/documents'
+import { fetchDocuments, deleteDocument, getDocumentUrl, fetchDocumentEntities, reextractEntities } from '../api/documents'
 import type { Document, DocumentEntity } from '../types'
 
 const TYPE_STYLE: Record<string, { bg: string; label: string }> = {
@@ -99,11 +99,18 @@ function DocRow({ doc, onDelete }: { doc: Document; onDelete: () => void }) {
   const [downloading, setDownloading] = useState(false)
   const [showEntities, setShowEntities] = useState(false)
 
+  const qc = useQueryClient()
+
   const { data: entities = [], isLoading: entitiesLoading } = useQuery({
     queryKey: ['entities', doc.id],
     queryFn: () => fetchDocumentEntities(doc.id),
     enabled: showEntities && doc.status === 'ready',
     staleTime: 5 * 60 * 1000,
+  })
+
+  const reextractMut = useMutation({
+    mutationFn: () => reextractEntities(doc.id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['entities', doc.id] }),
   })
 
   const typeStyle = TYPE_STYLE[doc.filetype] ?? {
@@ -211,7 +218,19 @@ function DocRow({ doc, onDelete }: { doc: Document; onDelete: () => void }) {
               ))}
             </div>
           ) : entities.length === 0 ? (
-            <p className="text-[11px] text-gray-400">No entities extracted for this document.</p>
+            <div className="flex items-center gap-3">
+              <p className="text-[11px] text-gray-400">No entities extracted yet.</p>
+              <button
+                onClick={() => reextractMut.mutate()}
+                disabled={reextractMut.isPending}
+                className="text-[11px] px-2.5 py-1 bg-blue-50 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-100 transition disabled:opacity-50"
+              >
+                {reextractMut.isPending ? 'Extracting...' : 'Run extraction'}
+              </button>
+              {reextractMut.isError && (
+                <span className="text-[11px] text-red-500">Failed — check server logs</span>
+              )}
+            </div>
           ) : (
             <EntityPanel entities={entities} />
           )}

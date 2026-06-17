@@ -31,3 +31,10 @@ export async function fetchDocumentEntities(id: string): Promise<DocumentEntity[
   )
   return res.data.entities
 }
+
+export async function reextractEntities(id: string): Promise<DocumentEntity[]> {
+  const res = await apiClient.post<{ document_id: string; entities: DocumentEntity[] }>(
+    `/documents/${id}/extract`
+  )
+  return res.data.entities
+}

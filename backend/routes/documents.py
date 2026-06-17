@@ -120,6 +120,41 @@ def get_document_chunks(doc_id: str):
     }), 200
 
 
+@documents_bp.route("/documents/<doc_id>/extract", methods=["POST"])
+def reextract_entities(doc_id: str):
+    """Re-run entity extraction for an already-processed document."""
+    doc = Document.query.get(doc_id)
+    if not doc:
+        return jsonify({"error": "Document not found"}), 404
+    if doc.status != "ready":
+        return jsonify({"error": "Document not ready", "status": doc.status}), 409
+    doc_text = DocumentText.query.filter_by(document_id=doc_id).first()
+    if not doc_text:
+        return jsonify({"error": "No extracted text found"}), 404
+
+    try:
+        from extractor import extract_entities
+        extracted = extract_entities(doc_text.raw_text)
+        DocumentEntity.query.filter_by(document_id=doc_id).delete()
+        if extracted.get("doc_type"):
+            db.session.add(DocumentEntity(
+                document_id=doc_id, entity_type="doc_type",
+                label="Document Type", value=extracted["doc_type"],
+            ))
+        for ent in extracted.get("entities", []):
+            if ent.get("type") and ent.get("label") and ent.get("value"):
+                db.session.add(DocumentEntity(
+                    document_id=doc_id, entity_type=ent["type"],
+                    label=ent["label"], value=ent["value"],
+                ))
+        db.session.commit()
+        entities = DocumentEntity.query.filter_by(document_id=doc_id).all()
+        return jsonify({"document_id": doc_id, "entities": [e.to_dict() for e in entities]}), 200
+    except Exception as exc:
+        db.session.rollback()
+        return jsonify({"error": str(exc)}), 500
+
+
 @documents_bp.route("/documents/<doc_id>/entities", methods=["GET"])
 def get_document_entities(doc_id: str):
     doc = Document.query.get(doc_id)
