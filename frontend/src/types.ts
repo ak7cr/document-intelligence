@@ -35,3 +35,21 @@ export interface SearchResult {
   filename: string
   text: string
 }
+
+export interface ChatSource {
+  filename: string
+  chunk_index: number
+  text: string
+  score: number
+}
+
+export interface ChatMessage {
+  role: 'user' | 'assistant' | 'error'
+  content: string
+  sources?: ChatSource[]
+}
+
+export interface ChatResponse {
+  answer: string
+  sources: ChatSource[]
+}

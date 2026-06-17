@@ -4,10 +4,14 @@ import Sidebar from './components/Sidebar'
 import UploadZone from './components/UploadZone'
 import DocumentList from './components/DocumentList'
 import SearchPanel from './components/SearchPanel'
+import ChatPanel from './components/ChatPanel'
 import { fetchSessions } from './api/sessions'
+
+type Tab = 'documents' | 'chat'
 
 export default function App() {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
+  const [tab, setTab] = useState<Tab>('documents')
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
 
@@ -16,27 +20,26 @@ export default function App() {
     queryFn: fetchSessions,
   })
 
-  // Auto-select the first session on initial load
   useEffect(() => {
     if (sessions.length > 0 && activeSessionId === null) {
       setActiveSessionId(sessions[0].id)
     }
   }, [sessions, activeSessionId])
 
-  // Clear search when switching sessions
+  // Reset UI state on session switch
   useEffect(() => {
+    setTab('documents')
     setSearchQuery('')
     setDebouncedQuery('')
   }, [activeSessionId])
 
-  // Debounce search input by 300 ms
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQuery(searchQuery), 300)
     return () => clearTimeout(t)
   }, [searchQuery])
 
   const activeSession = sessions.find((s) => s.id === activeSessionId) ?? null
-  const isSearching = debouncedQuery.trim().length > 2
+  const isSearching = tab === 'documents' && debouncedQuery.trim().length > 2
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
@@ -50,7 +53,8 @@ export default function App() {
           <>
             {/* Session header */}
             <div className="bg-white border-b border-gray-200 px-8 py-4 shrink-0">
-              <div className="flex items-center justify-between gap-6">
+              <div className="flex items-start justify-between gap-6">
+                {/* Title + tabs */}
                 <div className="min-w-0">
                   <h1 className="text-lg font-semibold text-gray-900 leading-tight truncate">
                     {activeSession.name}
@@ -60,46 +64,58 @@ export default function App() {
                       {activeSession.description}
                     </p>
                   )}
+                  {/* Tab bar */}
+                  <div className="flex gap-1 mt-3">
+                    <TabButton label="Documents" active={tab === 'documents'} onClick={() => setTab('documents')} />
+                    <TabButton label="Chat" active={tab === 'chat'} onClick={() => setTab('chat')} />
+                  </div>
                 </div>
 
-                {/* Search bar */}
-                <div className="relative w-72 shrink-0">
-                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm select-none">
-                    🔍
-                  </span>
-                  <input
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search documents…"
-                    className="w-full text-sm bg-gray-50 border border-gray-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 rounded-lg pl-9 pr-8 py-2 outline-none transition"
-                  />
-                  {searchQuery && (
-                    <button
-                      onClick={() => setSearchQuery('')}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs transition"
-                      aria-label="Clear search"
-                    >
-                      x
-                    </button>
-                  )}
-                </div>
+                {/* Search bar — only visible in Documents tab */}
+                {tab === 'documents' && (
+                  <div className="relative w-64 shrink-0 mt-1">
+                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm select-none">
+                      🔍
+                    </span>
+                    <input
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search documents..."
+                      className="w-full text-sm bg-gray-50 border border-gray-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 rounded-lg pl-9 pr-8 py-2 outline-none transition"
+                    />
+                    {searchQuery && (
+                      <button
+                        onClick={() => setSearchQuery('')}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs transition"
+                      >
+                        x
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Scrollable content */}
-            <div className="flex-1 overflow-y-auto p-8 space-y-6">
-              {isSearching ? (
-                <SearchPanel
-                  sessionId={activeSession.id}
-                  query={debouncedQuery.trim()}
-                />
-              ) : (
-                <>
-                  <UploadZone sessionId={activeSession.id} />
-                  <DocumentList sessionId={activeSession.id} />
-                </>
-              )}
-            </div>
+            {/* Content */}
+            {tab === 'chat' ? (
+              <div className="flex-1 overflow-hidden">
+                <ChatPanel sessionId={activeSession.id} />
+              </div>
+            ) : (
+              <div className="flex-1 overflow-y-auto p-8 space-y-6">
+                {isSearching ? (
+                  <SearchPanel
+                    sessionId={activeSession.id}
+                    query={debouncedQuery.trim()}
+                  />
+                ) : (
+                  <>
+                    <UploadZone sessionId={activeSession.id} />
+                    <DocumentList sessionId={activeSession.id} />
+                  </>
+                )}
+              </div>
+            )}
           </>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-center px-8 select-none">
@@ -116,5 +132,21 @@ export default function App() {
         )}
       </main>
     </div>
+  )
+}
+
+function TabButton({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className={
+        'px-3 py-1 text-xs font-medium rounded-md transition ' +
+        (active
+          ? 'bg-blue-50 text-blue-700'
+          : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100')
+      }
+    >
+      {label}
+    </button>
   )
 }
