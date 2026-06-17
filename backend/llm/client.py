@@ -59,13 +59,15 @@ def _gemini(prompt: str) -> str:
             "Add it or switch LLM_PROVIDER=ollama."
         )
     try:
-        import google.generativeai as genai
+        from google import genai
     except ImportError:
         raise RuntimeError(
-            "google-generativeai is not installed. "
-            "Run: pip install google-generativeai"
+            "google-genai is not installed. "
+            "Run: pip install google-genai"
         )
-    genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel(GEMINI_MODEL)
-    response = model.generate_content(prompt)
+    client = genai.Client(api_key=GEMINI_API_KEY)
+    response = client.models.generate_content(
+        model=GEMINI_MODEL,
+        contents=prompt,
+    )
     return response.text.strip()

@@ -83,9 +83,9 @@ def search_chunks(
         must.append(FieldCondition(key="session_id", match=MatchValue(value=session_id)))
     query_filter = Filter(must=must) if must else None
 
-    hits = _get_client().search(
+    response = _get_client().query_points(
         collection_name=COLLECTION,
-        query_vector=query_vec,
+        query=query_vec,
         query_filter=query_filter,
         limit=top_k,
         with_payload=True,
@@ -99,5 +99,5 @@ def search_chunks(
             "filename": h.payload.get("filename"),
             "text": h.payload.get("text"),
         }
-        for h in hits
+        for h in response.points
     ]

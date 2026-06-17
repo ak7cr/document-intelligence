@@ -16,7 +16,7 @@ Pillow
 celery[redis]
 sentence-transformers
 qdrant-client
-google-generativeai
+google-genai
 ollama
 langchain-ollama
 llama-index-llms-ollama

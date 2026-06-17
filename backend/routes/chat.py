@@ -1,7 +1,11 @@
+import logging
+
 from flask import Blueprint, jsonify, request
 
 from models import Session
 from rag import answer_question
+
+logger = logging.getLogger(__name__)
 
 chat_bp = Blueprint("chat", __name__)
 
@@ -22,4 +26,5 @@ def chat(session_id: str):
     except RuntimeError as exc:
         return jsonify({"error": str(exc)}), 503
     except Exception as exc:
+        logger.exception("Chat error for session %s", session_id)
         return jsonify({"error": "Internal error", "detail": str(exc)}), 500
