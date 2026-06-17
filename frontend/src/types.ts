@@ -37,8 +37,10 @@ export interface SearchResult {
 }
 
 export interface ChatSource {
+  document_id: string
   filename: string
   chunk_index: number
+  page_number: number | null
   text: string
   score: number
 }

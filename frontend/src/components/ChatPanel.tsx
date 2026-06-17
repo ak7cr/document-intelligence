@@ -52,7 +52,7 @@ export default function ChatPanel({ sessionId }: Props) {
       <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
         {empty && !loading && (
           <div className="flex flex-col items-center justify-center h-full text-center text-gray-400 select-none pt-16">
-            <div className="text-4xl mb-3">💬</div>
+            <div className="text-4xl mb-3">&#128172;</div>
             <p className="text-sm font-medium text-gray-500">Ask anything about your documents</p>
             <p className="text-xs mt-1 max-w-xs leading-relaxed">
               The AI will answer using only the content from documents in this session.
@@ -66,7 +66,7 @@ export default function ChatPanel({ sessionId }: Props) {
 
         {loading && (
           <div className="flex gap-3">
-            <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center text-xs shrink-0 mt-0.5">
+            <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center text-xs shrink-0 mt-0.5 text-blue-700 font-bold">
               AI
             </div>
             <div className="bg-white border border-gray-100 rounded-2xl rounded-tl-sm px-4 py-3">
@@ -112,7 +112,7 @@ export default function ChatPanel({ sessionId }: Props) {
 }
 
 function MessageBubble({ message }: { message: ChatMessage }) {
-  const [showSources, setShowSources] = useState(false)
+  const [showSources, setShowSources] = useState(true)
 
   if (message.role === 'user') {
     return (
@@ -127,7 +127,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
   if (message.role === 'error') {
     return (
       <div className="flex gap-3">
-        <div className="w-7 h-7 rounded-full bg-red-100 flex items-center justify-center text-xs shrink-0 mt-0.5 text-red-500">
+        <div className="w-7 h-7 rounded-full bg-red-100 flex items-center justify-center text-xs shrink-0 mt-0.5 text-red-500 font-bold">
           !
         </div>
         <div className="bg-red-50 border border-red-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-red-600 max-w-[80%]">
@@ -136,6 +136,8 @@ function MessageBubble({ message }: { message: ChatMessage }) {
       </div>
     )
   }
+
+  const hasSources = message.sources && message.sources.length > 0
 
   return (
     <div className="flex gap-3">
@@ -147,18 +149,22 @@ function MessageBubble({ message }: { message: ChatMessage }) {
           {message.content}
         </div>
 
-        {message.sources && message.sources.length > 0 && (
+        {hasSources && (
           <div>
             <button
               onClick={() => setShowSources((v) => !v)}
-              className="text-[11px] text-gray-400 hover:text-gray-600 transition px-1"
+              className="flex items-center gap-1.5 text-[11px] text-gray-400 hover:text-gray-600 transition px-1 mb-1.5"
             >
-              {showSources ? 'Hide' : 'Show'} {message.sources.length} source{message.sources.length !== 1 ? 's' : ''}
+              <span className="text-[10px]">{showSources ? '&#9660;' : '&#9654;'}</span>
+              <span>
+                {message.sources!.length} source{message.sources!.length !== 1 ? 's' : ''}
+                {showSources ? '' : ' (click to expand)'}
+              </span>
             </button>
             {showSources && (
-              <div className="mt-1.5 space-y-1.5">
-                {message.sources.map((s, i) => (
-                  <SourceCard key={i} source={s} />
+              <div className="space-y-1.5">
+                {message.sources!.map((s, i) => (
+                  <SourceCard key={i} source={s} index={i + 1} />
                 ))}
               </div>
             )}
@@ -169,15 +175,27 @@ function MessageBubble({ message }: { message: ChatMessage }) {
   )
 }
 
-function SourceCard({ source }: { source: ChatSource }) {
+function SourceCard({ source, index }: { source: ChatSource; index: number }) {
   const pct = Math.round(source.score * 100)
+  const location = source.page_number != null
+    ? 'p. ' + source.page_number
+    : 'chunk ' + source.chunk_index
+
   return (
     <div className="bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5">
-      <div className="flex items-center justify-between gap-2 mb-1">
-        <p className="text-[11px] font-semibold text-gray-700 truncate">{source.filename}</p>
-        <span className="text-[10px] text-gray-400 shrink-0">{pct}% match</span>
+      <div className="flex items-start justify-between gap-2 mb-1.5">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="text-[10px] font-bold text-blue-600 bg-blue-50 rounded px-1.5 py-0.5 shrink-0">
+            [{index}]
+          </span>
+          <p className="text-[11px] font-semibold text-gray-700 truncate">{source.filename}</p>
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span className="text-[10px] text-gray-400 bg-gray-100 rounded px-1.5 py-0.5">{location}</span>
+          <span className="text-[10px] text-emerald-600 bg-emerald-50 rounded px-1.5 py-0.5">{pct}%</span>
+        </div>
       </div>
-      <p className="text-[11px] text-gray-500 leading-relaxed line-clamp-2">{source.text}</p>
+      <p className="text-[11px] text-gray-500 leading-relaxed line-clamp-3">{source.text}</p>
     </div>
   )
 }
