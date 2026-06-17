@@ -4,10 +4,13 @@ import logging
 
 from celery_app import celery
 from chunker import chunk_text
-from models import Document, DocumentChunk, DocumentText, db
+from extractor import extract_entities
+from models import Document, DocumentChunk, DocumentEntity, DocumentPrediction, DocumentSummary, DocumentText, db
+from predictor import predict_document
 from processors import dispatch
 from qdrant_client.models import PointStruct
 from storage.minio_client import get_client
+from summarizer import summarize_document
 from vector import delete_doc_vectors, embed_passages, upsert_chunks
 
 logger = logging.getLogger(__name__)
@@ -99,8 +102,6 @@ def _process(task, doc_id: str) -> None:
 
         # ── Extract entities ──────────────────────────────────────────────
         try:
-            from extractor import extract_entities
-            from models import DocumentEntity
             extracted = extract_entities(result.text)
             DocumentEntity.query.filter_by(document_id=doc_id).delete()
             if extracted.get("doc_type"):
@@ -124,8 +125,6 @@ def _process(task, doc_id: str) -> None:
 
         # ── Summarise document ────────────────────────────────────────────
         try:
-            from summarizer import summarize_document
-            from models import DocumentSummary
             s = summarize_document(result.text)
             existing_summary = DocumentSummary.query.filter_by(document_id=doc_id).first()
             if existing_summary:
@@ -145,8 +144,6 @@ def _process(task, doc_id: str) -> None:
 
         # ── Predict risk ──────────────────────────────────────────────────────
         try:
-            from predictor import predict_document
-            from models import DocumentPrediction
             pred = predict_document(doc_id)
             existing_pred = DocumentPrediction.query.filter_by(document_id=doc_id).first()
             if existing_pred:
