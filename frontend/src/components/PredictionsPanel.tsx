@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { fetchDocuments, fetchPrediction, runPrediction } from '../api/documents'
-import type { DocumentPrediction } from '../types'
+import type { DocumentPrediction as Prediction } from '../types'
 
 interface Props {
   sessionId: string
@@ -66,7 +66,7 @@ function PredictionCard({ docId, filename }: { docId: string; filename: string }
   const [expanded, setExpanded] = useState(false)
   const qc = useQueryClient()
 
-  const { data: prediction, isLoading, isError } = useQuery({
+  const { data: prediction, isLoading, isError } = useQuery<Prediction>({
     queryKey: ['prediction', docId],
     queryFn: () => fetchPrediction(docId),
     retry: false,
@@ -78,7 +78,7 @@ function PredictionCard({ docId, filename }: { docId: string; filename: string }
     onSuccess: () => qc.invalidateQueries({ queryKey: ['prediction', docId] }),
   })
 
-  const risk = prediction?.risk_level ?? 'unknown'
+  const risk: string = prediction?.risk_level ?? 'unknown'
   const style = RISK_STYLE[risk] ?? RISK_STYLE.unknown
   const confidencePct = prediction ? Math.round(prediction.confidence * 100) : 0
   const hasPrediction = !!prediction && risk !== 'unknown'
