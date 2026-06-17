@@ -3,7 +3,7 @@ import uuid
 from flask import Blueprint, jsonify, request
 from werkzeug.utils import secure_filename
 
-from models import Document, DocumentChunk, DocumentEntity, DocumentSummary, DocumentText, Session, db
+from models import Document, DocumentChunk, DocumentEntity, DocumentPrediction, DocumentSummary, DocumentText, Session, db
 from processing import trigger_processing
 from storage import DOCUMENT_BUCKET, delete_file, get_presigned_url, upload_file
 from storage.minio_client import CONTENT_TYPES
@@ -216,6 +216,45 @@ def get_document_entities(doc_id: str):
         "document_id": doc_id,
         "entities": [e.to_dict() for e in entities],
     }), 200
+
+
+@documents_bp.route("/documents/<doc_id>/prediction", methods=["GET"])
+def get_prediction(doc_id: str):
+    doc = Document.query.get(doc_id)
+    if not doc:
+        return jsonify({"error": "Document not found"}), 404
+    p = DocumentPrediction.query.filter_by(document_id=doc_id).first()
+    if not p:
+        return jsonify({"error": "No prediction yet", "status": doc.status}), 404
+    return jsonify(p.to_dict()), 200
+
+
+@documents_bp.route("/documents/<doc_id>/predict", methods=["POST"])
+def run_prediction(doc_id: str):
+    doc = Document.query.get(doc_id)
+    if not doc:
+        return jsonify({"error": "Document not found"}), 404
+    if doc.status != "ready":
+        return jsonify({"error": "Document not ready", "status": doc.status}), 409
+    try:
+        from predictor import predict_document
+        result = predict_document(doc_id)
+        p = DocumentPrediction.query.filter_by(document_id=doc_id).first()
+        if p:
+            p.risk_level = result["risk_level"]
+            p.confidence = result["confidence"]
+            p.timeline_urgency = result["timeline_urgency"]
+            p.risk_factors = result["risk_factors"]
+            p.opportunities = result["opportunities"]
+            p.recommended_actions = result["recommended_actions"]
+        else:
+            p = DocumentPrediction(document_id=doc_id, **result)
+            db.session.add(p)
+        db.session.commit()
+        return jsonify(p.to_dict()), 200
+    except Exception as exc:
+        db.session.rollback()
+        return jsonify({"error": str(exc)}), 500
 
 
 @documents_bp.route("/documents/<doc_id>", methods=["DELETE"])

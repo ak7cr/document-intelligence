@@ -51,6 +51,17 @@ export interface DocumentEntity {
   value: string
 }
 
+export interface DocumentPrediction {
+  document_id: string
+  risk_level: 'low' | 'medium' | 'high' | 'unknown'
+  confidence: number
+  timeline_urgency: string
+  risk_factors: string[]
+  opportunities: string[]
+  recommended_actions: string[]
+  created_at: string
+}
+
 export interface AnalyticsTotals {
   documents: number
   ready: number

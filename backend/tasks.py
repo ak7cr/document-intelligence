@@ -143,6 +143,25 @@ def _process(task, doc_id: str) -> None:
         except Exception:
             logger.exception("Summarization failed for document %s — skipping", doc_id)
 
+        # ── Predict risk ──────────────────────────────────────────────────────
+        try:
+            from predictor import predict_document
+            from models import DocumentPrediction
+            result = predict_document(doc_id)
+            existing_pred = DocumentPrediction.query.filter_by(document_id=doc_id).first()
+            if existing_pred:
+                existing_pred.risk_level = result["risk_level"]
+                existing_pred.confidence = result["confidence"]
+                existing_pred.timeline_urgency = result["timeline_urgency"]
+                existing_pred.risk_factors = result["risk_factors"]
+                existing_pred.opportunities = result["opportunities"]
+                existing_pred.recommended_actions = result["recommended_actions"]
+            else:
+                db.session.add(DocumentPrediction(document_id=doc_id, **result))
+            logger.info("Risk prediction for document %s: %s", doc_id, result["risk_level"])
+        except Exception:
+            logger.exception("Prediction failed for document %s — skipping", doc_id)
+
         doc.status = "ready"
         db.session.commit()
         logger.info(

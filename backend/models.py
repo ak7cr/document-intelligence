@@ -68,6 +68,12 @@ class Document(db.Model):
         uselist=False,
         cascade="all, delete-orphan",
     )
+    prediction = db.relationship(
+        "DocumentPrediction",
+        backref="document",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
 
     def to_dict(self) -> dict:
         data: dict = {
@@ -142,6 +148,37 @@ class DocumentChunk(db.Model):
             "chunk_index": self.chunk_index,
             "text": self.text,
             "token_count": self.token_count,
+        }
+
+
+class DocumentPrediction(db.Model):
+    __tablename__ = "document_predictions"
+
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    document_id = db.Column(
+        db.String(36),
+        db.ForeignKey("documents.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
+    risk_level = db.Column(db.String(10), nullable=False, default="unknown")
+    confidence = db.Column(db.Float, nullable=False, default=0.0)
+    timeline_urgency = db.Column(db.Text, nullable=False, default="")
+    risk_factors = db.Column(db.JSON, nullable=False, default=list)
+    opportunities = db.Column(db.JSON, nullable=False, default=list)
+    recommended_actions = db.Column(db.JSON, nullable=False, default=list)
+    created_at = db.Column(db.DateTime, default=_now)
+
+    def to_dict(self) -> dict:
+        return {
+            "document_id": self.document_id,
+            "risk_level": self.risk_level,
+            "confidence": self.confidence,
+            "timeline_urgency": self.timeline_urgency,
+            "risk_factors": self.risk_factors or [],
+            "opportunities": self.opportunities or [],
+            "recommended_actions": self.recommended_actions or [],
+            "created_at": self.created_at.isoformat(),
         }
 
 

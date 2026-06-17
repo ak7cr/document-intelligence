@@ -7,10 +7,11 @@ import SearchPanel from './components/SearchPanel'
 import ChatPanel from './components/ChatPanel'
 import ComparePanel from './components/ComparePanel'
 import AnalyticsPanel from './components/AnalyticsPanel'
+import PredictionsPanel from './components/PredictionsPanel'
 import { fetchSessions } from './api/sessions'
 import { exportJson, exportCsv, exportXlsx } from './api/export'
 
-type Tab = 'documents' | 'chat' | 'compare' | 'analytics'
+type Tab = 'documents' | 'chat' | 'compare' | 'analytics' | 'predictions'
 
 export default function App() {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
@@ -68,6 +69,7 @@ export default function App() {
                     <TabButton label="Chat" active={tab === 'chat'} onClick={() => setTab('chat')} />
                     <TabButton label="Compare" active={tab === 'compare'} onClick={() => setTab('compare')} />
                     <TabButton label="Analytics" active={tab === 'analytics'} onClick={() => setTab('analytics')} />
+                    <TabButton label="Predictions" active={tab === 'predictions'} onClick={() => setTab('predictions')} />
                   </div>
                 </div>
 
@@ -111,6 +113,10 @@ export default function App() {
             ) : tab === 'analytics' ? (
               <div className="flex-1 overflow-y-auto">
                 <AnalyticsPanel sessionId={activeSession.id} />
+              </div>
+            ) : tab === 'predictions' ? (
+              <div className="flex-1 overflow-y-auto">
+                <PredictionsPanel sessionId={activeSession.id} />
               </div>
             ) : (
               <div className="flex-1 overflow-y-auto p-8 space-y-6">
