@@ -42,14 +42,14 @@ def compare_session_docs(session_id: str):
         return jsonify({"error": "Session not found"}), 404
     data = request.json or {}
     doc_ids = data.get("doc_ids", [])
-    if len(doc_ids) != 2:
-        return jsonify({"error": "Exactly 2 doc_ids required"}), 400
+    if len(doc_ids) < 2:
+        return jsonify({"error": "At least 2 doc_ids required"}), 400
     try:
         from compare import compare_documents
-        result = compare_documents(doc_ids[0], doc_ids[1])
+        result = compare_documents(doc_ids)
         return jsonify(result), 200
     except ValueError as exc:
-        return jsonify({"error": str(exc)}), 404
+        return jsonify({"error": str(exc)}), 400
     except Exception as exc:
         return jsonify({"error": "Comparison failed", "detail": str(exc)}), 500
 

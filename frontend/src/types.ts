@@ -53,8 +53,7 @@ export interface DocumentEntity {
 
 export interface ComparisonDifference {
   aspect: string
-  doc_a: string
-  doc_b: string
+  values: string[]  // one entry per selected document, in order
 }
 
 export interface ComparisonAnalysis {
@@ -75,8 +74,7 @@ export interface ComparisonDoc {
 }
 
 export interface ComparisonResult {
-  doc_a: ComparisonDoc
-  doc_b: ComparisonDoc
+  docs: ComparisonDoc[]   // N documents in the order they were submitted
   analysis: ComparisonAnalysis
 }
 

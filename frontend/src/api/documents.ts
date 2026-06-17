@@ -49,9 +49,9 @@ export async function resummarizeDocument(id: string): Promise<DocumentSummary> 
   return res.data
 }
 
-export async function compareDocuments(sessionId: string, docIdA: string, docIdB: string): Promise<ComparisonResult> {
+export async function compareDocuments(sessionId: string, docIds: string[]): Promise<ComparisonResult> {
   const res = await apiClient.post<ComparisonResult>(`/sessions/${sessionId}/compare`, {
-    doc_ids: [docIdA, docIdB],
+    doc_ids: docIds,
   })
   return res.data
 }

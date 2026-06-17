@@ -1,4 +1,4 @@
-"""Side-by-side document comparison using extracted metadata + LLM narrative."""
+"""Multi-document comparison using extracted metadata + LLM narrative."""
 
 import json
 import logging
@@ -7,45 +7,56 @@ import re
 
 logger = logging.getLogger(__name__)
 
-MAX_TEXT_CHARS = 6_000  # per document
+MAX_TEXT_CHARS = 4_000  # per document (reduced so N docs fit in context)
+MAX_DOCS = 8
 
-_PROMPT = """\
-You are a document analyst. Compare the two documents below and return structured analysis.
+_PROMPT_HEADER = """\
+You are a document analyst. Compare the {n} documents below and return structured analysis.
 Return ONLY a valid JSON object — no markdown, no prose:
 {{
-  "similarities": ["<point 1>", "<point 2>"],
+  "similarities": ["<shared characteristic 1>", "<shared characteristic 2>"],
   "differences": [
-    {{"aspect": "<what differs>", "doc_a": "<value in Doc A>", "doc_b": "<value in Doc B>"}}
+    {{
+      "aspect": "<what differs>",
+      "values": ["<value for Doc 1>", "<value for Doc 2>", ...]
+    }}
   ],
-  "recommendation": "<1-2 sentence conclusion about which is more favourable or what action to take>"
+  "recommendation": "<1-2 sentence conclusion covering all documents>"
 }}
 
 Rules:
-- similarities: 2-5 bullet points on shared characteristics
-- differences: 3-8 key differences, each with a clear aspect label
+- similarities: 2-5 bullet points on characteristics shared by most/all documents
+- differences: 3-8 key differences; values array MUST have exactly {n} entries (one per doc, in order)
+- Use "--" when a value is not found in a document
 - recommendation: actionable, neutral, factual
 
---- Document A: {name_a} ---
-{text_a}
+"""
 
---- Document B: {name_b} ---
-{text_b}
+_DOC_BLOCK = """\
+--- Document {label}: {name} ---
+{context}
 
-JSON:"""
+"""
 
 
-def compare_documents(doc_id_a: str, doc_id_b: str) -> dict:
-    """Load both documents, build context, run LLM comparison."""
-    from models import Document, DocumentText, DocumentEntity, DocumentSummary
+def compare_documents(doc_ids: list[str]) -> dict:
+    """Load N documents, build per-doc context, run LLM comparison."""
+    if len(doc_ids) < 2:
+        raise ValueError("At least 2 documents required")
+    if len(doc_ids) > MAX_DOCS:
+        raise ValueError(f"Maximum {MAX_DOCS} documents per comparison")
 
-    def _load(doc_id: str):
+    from models import Document, DocumentEntity, DocumentSummary, DocumentText
+
+    docs = []
+    for doc_id in doc_ids:
         doc = Document.query.get(doc_id)
         if not doc:
             raise ValueError(f"Document {doc_id} not found")
         dt = DocumentText.query.filter_by(document_id=doc_id).first()
-        entities = DocumentEntity.query.filter_by(document_id=doc_id).all()
         summary = DocumentSummary.query.filter_by(document_id=doc_id).first()
-        return {
+        entities = DocumentEntity.query.filter_by(document_id=doc_id).all()
+        docs.append({
             "id": doc.id,
             "filename": doc.filename,
             "filetype": doc.filetype,
@@ -56,29 +67,30 @@ def compare_documents(doc_id_a: str, doc_id_b: str) -> dict:
             "summary_text": summary.summary_text if summary else "",
             "key_points": summary.key_points if summary else [],
             "entities": [e.to_dict() for e in entities],
-        }
+        })
 
-    doc_a = _load(doc_id_a)
-    doc_b = _load(doc_id_b)
+    n = len(docs)
+    labels = [str(i + 1) for i in range(n)]
 
-    prompt = _PROMPT.format(
-        name_a=doc_a["filename"],
-        text_a=_build_context(doc_a),
-        name_b=doc_b["filename"],
-        text_b=_build_context(doc_b),
-    )
+    prompt = _PROMPT_HEADER.format(n=n)
+    for i, doc in enumerate(docs):
+        prompt += _DOC_BLOCK.format(
+            label=labels[i],
+            name=doc["filename"],
+            context=_build_context(doc),
+        )
+    prompt += "JSON:"
 
     provider = os.getenv("LLM_PROVIDER", "ollama")
     try:
         raw = _call_gemini(prompt) if provider == "gemini" else _call_ollama(prompt)
-        analysis = _parse(raw)
+        analysis = _parse(raw, n)
     except Exception:
         logger.exception("Comparison LLM call failed")
         analysis = {"similarities": [], "differences": [], "recommendation": ""}
 
     return {
-        "doc_a": _public(doc_a),
-        "doc_b": _public(doc_b),
+        "docs": [_public(d) for d in docs],
         "analysis": analysis,
     }
 
@@ -93,7 +105,7 @@ def _build_context(doc: dict) -> str:
         ent_lines = [f"- {e['label']}: {e['value']}" for e in doc["entities"]]
         parts.append("Extracted entities:\n" + "\n".join(ent_lines))
     if doc["text"]:
-        parts.append("Document excerpt:\n" + doc["text"])
+        parts.append("Excerpt:\n" + doc["text"])
     return "\n\n".join(parts)
 
 
@@ -125,30 +137,33 @@ def _call_ollama(prompt: str) -> str:
     resp = requests.post(
         f"{os.getenv('OLLAMA_HOST', 'http://localhost:11434')}/api/generate",
         json={"model": os.getenv("OLLAMA_MODEL", "llama3.2"), "prompt": prompt, "stream": False},
-        timeout=120,
+        timeout=180,
     )
     resp.raise_for_status()
     return resp.json()["response"].strip()
 
 
-def _parse(raw: str) -> dict:
+def _parse(raw: str, n: int) -> dict:
     text = raw.strip()
     fence = re.search(r"```(?:json)?\s*([\s\S]*?)```", text)
     if fence:
         text = fence.group(1).strip()
     try:
         data = json.loads(text)
+        diffs = []
+        for d in data.get("differences", []):
+            aspect = str(d.get("aspect", "")).strip()
+            if not aspect:
+                continue
+            values = d.get("values", [])
+            # Pad or trim to exactly n entries
+            values = [str(v).strip() for v in values]
+            while len(values) < n:
+                values.append("--")
+            diffs.append({"aspect": aspect, "values": values[:n]})
         return {
             "similarities": [str(s).strip() for s in data.get("similarities", []) if s],
-            "differences": [
-                {
-                    "aspect": str(d.get("aspect", "")).strip(),
-                    "doc_a": str(d.get("doc_a", "")).strip(),
-                    "doc_b": str(d.get("doc_b", "")).strip(),
-                }
-                for d in data.get("differences", [])
-                if d.get("aspect")
-            ],
+            "differences": diffs,
             "recommendation": str(data.get("recommendation", "")).strip(),
         }
     except (json.JSONDecodeError, TypeError):
