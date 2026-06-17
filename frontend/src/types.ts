@@ -51,6 +51,27 @@ export interface DocumentEntity {
   value: string
 }
 
+export interface AnalyticsTotals {
+  documents: number
+  ready: number
+  processing: number
+  failed: number
+  pages: number
+  words: number
+  chunks: number
+  entities: number
+}
+
+export interface AnalyticsResult {
+  session_id: string
+  session_name: string
+  totals: AnalyticsTotals
+  doc_types: Record<string, number>
+  entity_types: Record<string, number>
+  top_entities: Record<string, { value: string; count: number }[]>
+  timeline: { date: string; count: number }[]
+}
+
 export interface ComparisonDifference {
   aspect: string
   values: string[]  // one entry per selected document, in order

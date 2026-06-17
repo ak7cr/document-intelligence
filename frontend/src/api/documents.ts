@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { ComparisonResult, Document, DocumentEntity, DocumentSummary } from '../types'
+import type { AnalyticsResult, ComparisonResult, Document, DocumentEntity, DocumentSummary } from '../types'
 
 export async function fetchDocuments(sessionId: string): Promise<Document[]> {
   const res = await apiClient.get<Document[]>(`/documents/${sessionId}`)
@@ -46,6 +46,11 @@ export async function fetchDocumentSummary(id: string): Promise<DocumentSummary>
 
 export async function resummarizeDocument(id: string): Promise<DocumentSummary> {
   const res = await apiClient.post<DocumentSummary>(`/documents/${id}/summarize`)
+  return res.data
+}
+
+export async function fetchAnalytics(sessionId: string): Promise<AnalyticsResult> {
+  const res = await apiClient.get<AnalyticsResult>(`/sessions/${sessionId}/analytics`)
   return res.data
 }
 
