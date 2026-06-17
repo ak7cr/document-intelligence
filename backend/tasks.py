@@ -97,6 +97,31 @@ def _process(task, doc_id: str) -> None:
                 for i, c in enumerate(db_chunks)
             ])
 
+        # ── Extract entities ──────────────────────────────────────────────
+        try:
+            from extractor import extract_entities
+            from models import DocumentEntity
+            extracted = extract_entities(result.text)
+            DocumentEntity.query.filter_by(document_id=doc_id).delete()
+            if extracted.get("doc_type"):
+                db.session.add(DocumentEntity(
+                    document_id=doc_id,
+                    entity_type="doc_type",
+                    label="Document Type",
+                    value=extracted["doc_type"],
+                ))
+            for ent in extracted.get("entities", []):
+                if ent.get("type") and ent.get("label") and ent.get("value"):
+                    db.session.add(DocumentEntity(
+                        document_id=doc_id,
+                        entity_type=ent["type"],
+                        label=ent["label"],
+                        value=ent["value"],
+                    ))
+            logger.info("Extracted %d entities for document %s", len(extracted.get("entities", [])) + bool(extracted.get("doc_type")), doc_id)
+        except Exception:
+            logger.exception("Entity extraction failed for document %s — skipping", doc_id)
+
         doc.status = "ready"
         db.session.commit()
         logger.info(

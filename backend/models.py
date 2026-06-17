@@ -56,6 +56,12 @@ class Document(db.Model):
         cascade="all, delete-orphan",
         order_by="DocumentChunk.chunk_index",
     )
+    entities = db.relationship(
+        "DocumentEntity",
+        backref="document",
+        lazy=True,
+        cascade="all, delete-orphan",
+    )
 
     def to_dict(self) -> dict:
         data: dict = {
@@ -130,4 +136,30 @@ class DocumentChunk(db.Model):
             "chunk_index": self.chunk_index,
             "text": self.text,
             "token_count": self.token_count,
+        }
+
+
+class DocumentEntity(db.Model):
+    __tablename__ = "document_entities"
+
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    document_id = db.Column(
+        db.String(36),
+        db.ForeignKey("documents.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    entity_type = db.Column(db.String(50), nullable=False)
+    label = db.Column(db.String(150), nullable=False)
+    value = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=_now)
+
+    __table_args__ = (db.Index("ix_entities_doc", "document_id"),)
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "document_id": self.document_id,
+            "entity_type": self.entity_type,
+            "label": self.label,
+            "value": self.value,
         }

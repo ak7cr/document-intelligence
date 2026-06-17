@@ -36,6 +36,14 @@ export interface SearchResult {
   text: string
 }
 
+export interface DocumentEntity {
+  id: string
+  document_id: string
+  entity_type: string
+  label: string
+  value: string
+}
+
 export interface ChatSource {
   document_id: string
   filename: string

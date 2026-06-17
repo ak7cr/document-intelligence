@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { Document } from '../types'
+import type { Document, DocumentEntity } from '../types'
 
 export async function fetchDocuments(sessionId: string): Promise<Document[]> {
   const res = await apiClient.get<Document[]>(`/documents/${sessionId}`)
@@ -23,4 +23,11 @@ export async function deleteDocument(id: string): Promise<void> {
 export async function getDocumentUrl(id: string): Promise<string> {
   const res = await apiClient.get<{ url: string }>(`/documents/${id}/url`)
   return res.data.url
+}
+
+export async function fetchDocumentEntities(id: string): Promise<DocumentEntity[]> {
+  const res = await apiClient.get<{ document_id: string; entities: DocumentEntity[] }>(
+    `/documents/${id}/entities`
+  )
+  return res.data.entities
 }
