@@ -5,9 +5,10 @@ import UploadZone from './components/UploadZone'
 import DocumentList from './components/DocumentList'
 import SearchPanel from './components/SearchPanel'
 import ChatPanel from './components/ChatPanel'
+import ComparePanel from './components/ComparePanel'
 import { fetchSessions } from './api/sessions'
 
-type Tab = 'documents' | 'chat'
+type Tab = 'documents' | 'chat' | 'compare'
 
 export default function App() {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
@@ -68,6 +69,7 @@ export default function App() {
                   <div className="flex gap-1 mt-3">
                     <TabButton label="Documents" active={tab === 'documents'} onClick={() => setTab('documents')} />
                     <TabButton label="Chat" active={tab === 'chat'} onClick={() => setTab('chat')} />
+                    <TabButton label="Compare" active={tab === 'compare'} onClick={() => setTab('compare')} />
                   </div>
                 </div>
 
@@ -100,6 +102,10 @@ export default function App() {
             {tab === 'chat' ? (
               <div className="flex-1 overflow-hidden">
                 <ChatPanel sessionId={activeSession.id} />
+              </div>
+            ) : tab === 'compare' ? (
+              <div className="flex-1 overflow-hidden">
+                <ComparePanel sessionId={activeSession.id} />
               </div>
             ) : (
               <div className="flex-1 overflow-y-auto p-8 space-y-6">

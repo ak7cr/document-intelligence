@@ -51,6 +51,35 @@ export interface DocumentEntity {
   value: string
 }
 
+export interface ComparisonDifference {
+  aspect: string
+  doc_a: string
+  doc_b: string
+}
+
+export interface ComparisonAnalysis {
+  similarities: string[]
+  differences: ComparisonDifference[]
+  recommendation: string
+}
+
+export interface ComparisonDoc {
+  id: string
+  filename: string
+  page_count: number | null
+  word_count: number | null
+  headline: string
+  summary_text: string
+  key_points: string[]
+  entities: DocumentEntity[]
+}
+
+export interface ComparisonResult {
+  doc_a: ComparisonDoc
+  doc_b: ComparisonDoc
+  analysis: ComparisonAnalysis
+}
+
 export interface ChatSource {
   document_id: string
   filename: string
