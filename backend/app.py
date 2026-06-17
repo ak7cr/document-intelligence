@@ -6,7 +6,7 @@ from sqlalchemy import text
 
 from celery_app import init_celery
 from models import db
-from routes import chat_bp, documents_bp, sessions_bp
+from routes import chat_bp, documents_bp, export_bp, sessions_bp
 from vector.store import init_collection as init_qdrant
 
 load_dotenv()
@@ -63,6 +63,7 @@ def create_app() -> Flask:
     app.register_blueprint(sessions_bp, url_prefix="/api")
     app.register_blueprint(documents_bp, url_prefix="/api")
     app.register_blueprint(chat_bp, url_prefix="/api")
+    app.register_blueprint(export_bp, url_prefix="/api")
 
     with app.app_context():
         db.create_all()
