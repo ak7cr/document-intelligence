@@ -2,15 +2,13 @@
 
 import logging
 
+from analyzer import analyze_document
 from celery_app import celery
 from chunker import chunk_text
-from extractor import extract_entities
 from models import Document, DocumentChunk, DocumentEntity, DocumentPrediction, DocumentSummary, DocumentText, db
-from predictor import predict_document
 from processors import dispatch
 from qdrant_client.models import PointStruct
 from storage.minio_client import get_client
-from summarizer import summarize_document
 from vector import delete_doc_vectors, embed_passages, upsert_chunks
 
 logger = logging.getLogger(__name__)
@@ -45,7 +43,7 @@ def _process(task, doc_id: str) -> None:
         # ── Extract text / OCR ───────────────────────────────────────────
         result = dispatch(doc.filetype, data)
 
-        # ── Persist ──────────────────────────────────────────────────────
+        # ── Persist text ──────────────────────────────────────────────────
         existing = DocumentText.query.filter_by(document_id=doc_id).first()
         if existing:
             existing.raw_text = result.text
@@ -100,18 +98,20 @@ def _process(task, doc_id: str) -> None:
                 for i, c in enumerate(db_chunks)
             ])
 
-        # ── Extract entities ──────────────────────────────────────────────
+        # ── Combined LLM analysis (1 call: entities + summary + prediction) ──
         try:
-            extracted = extract_entities(result.text)
+            analysis = analyze_document(result.text)
+
+            # entities
             DocumentEntity.query.filter_by(document_id=doc_id).delete()
-            if extracted.get("doc_type"):
+            if analysis.get("doc_type"):
                 db.session.add(DocumentEntity(
                     document_id=doc_id,
                     entity_type="doc_type",
                     label="Document Type",
-                    value=extracted["doc_type"],
+                    value=analysis["doc_type"],
                 ))
-            for ent in extracted.get("entities", []):
+            for ent in analysis.get("entities", []):
                 if ent.get("type") and ent.get("label") and ent.get("value"):
                     db.session.add(DocumentEntity(
                         document_id=doc_id,
@@ -119,45 +119,46 @@ def _process(task, doc_id: str) -> None:
                         label=ent["label"],
                         value=ent["value"],
                     ))
-            logger.info("Extracted %d entities for document %s", len(extracted.get("entities", [])) + bool(extracted.get("doc_type")), doc_id)
-        except Exception:
-            logger.exception("Entity extraction failed for document %s — skipping", doc_id)
+            logger.info(
+                "Extracted %d entities for document %s",
+                len(analysis.get("entities", [])) + bool(analysis.get("doc_type")),
+                doc_id,
+            )
 
-        # ── Summarise document ────────────────────────────────────────────
-        try:
-            s = summarize_document(result.text)
+            # summary
             existing_summary = DocumentSummary.query.filter_by(document_id=doc_id).first()
             if existing_summary:
-                existing_summary.headline = s["headline"]
-                existing_summary.summary_text = s["summary_text"]
-                existing_summary.key_points = s["key_points"]
+                existing_summary.headline = analysis["headline"]
+                existing_summary.summary_text = analysis["summary_text"]
+                existing_summary.key_points = analysis["key_points"]
             else:
                 db.session.add(DocumentSummary(
                     document_id=doc_id,
-                    headline=s["headline"],
-                    summary_text=s["summary_text"],
-                    key_points=s["key_points"],
+                    headline=analysis["headline"],
+                    summary_text=analysis["summary_text"],
+                    key_points=analysis["key_points"],
                 ))
             logger.info("Summary generated for document %s", doc_id)
-        except Exception:
-            logger.exception("Summarization failed for document %s — skipping", doc_id)
 
-        # ── Predict risk ──────────────────────────────────────────────────────
-        try:
-            pred = predict_document(doc_id)
+            # prediction
+            pred_fields = {
+                "risk_level": analysis["risk_level"],
+                "confidence": analysis["confidence"],
+                "timeline_urgency": analysis["timeline_urgency"],
+                "risk_factors": analysis["risk_factors"],
+                "opportunities": analysis["opportunities"],
+                "recommended_actions": analysis["recommended_actions"],
+            }
             existing_pred = DocumentPrediction.query.filter_by(document_id=doc_id).first()
             if existing_pred:
-                existing_pred.risk_level = pred["risk_level"]
-                existing_pred.confidence = pred["confidence"]
-                existing_pred.timeline_urgency = pred["timeline_urgency"]
-                existing_pred.risk_factors = pred["risk_factors"]
-                existing_pred.opportunities = pred["opportunities"]
-                existing_pred.recommended_actions = pred["recommended_actions"]
+                for k, v in pred_fields.items():
+                    setattr(existing_pred, k, v)
             else:
-                db.session.add(DocumentPrediction(document_id=doc_id, **pred))
-            logger.info("Risk prediction for document %s: %s", doc_id, pred["risk_level"])
+                db.session.add(DocumentPrediction(document_id=doc_id, **pred_fields))
+            logger.info("Risk prediction for document %s: %s", doc_id, analysis["risk_level"])
+
         except Exception:
-            logger.exception("Prediction failed for document %s — skipping", doc_id)
+            logger.exception("Combined analysis failed for document %s — skipping", doc_id)
 
         doc.status = "ready"
         db.session.commit()
@@ -172,7 +173,6 @@ def _process(task, doc_id: str) -> None:
 
     except Exception as exc:
         logger.exception("Processing failed for document %s", doc_id)
-        # Mark as failed; retry will attempt again up to max_retries
         try:
             doc.status = "failed"
             db.session.commit()
