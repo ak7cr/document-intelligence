@@ -47,8 +47,8 @@ def ocr_image(img_bytes: bytes) -> tuple[str, float]:
     """
     ocr = _get_ocr()
 
-    img = Image.open(io.BytesIO(img_bytes))
-    img_array = np.array(img)
+    img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+    img_array = np.array(img)  # shape: (H, W, 3) — PaddleOCR 3.x requires 3-channel
 
     # predict() returns a list of OCRResult (one per input image)
     results = ocr.predict(img_array)
