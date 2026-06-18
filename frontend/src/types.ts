@@ -180,9 +180,11 @@ export interface ChatMessage {
   role: 'user' | 'assistant' | 'error'
   content: string
   sources?: ChatSource[]
+  confidence?: 'high' | 'medium' | 'low'
 }
 
 export interface ChatResponse {
   answer: string
   sources: ChatSource[]
+  confidence?: 'high' | 'medium' | 'low'
 }

@@ -28,7 +28,7 @@ export default function ChatPanel({ sessionId }: Props) {
       const res = await chatSession(sessionId, question)
       setMessages((prev) => [
         ...prev,
-        { role: 'assistant', content: res.answer, sources: res.sources },
+        { role: 'assistant', content: res.answer, sources: res.sources, confidence: res.confidence },
       ])
     } catch (err: unknown) {
       const msg =
@@ -138,6 +138,14 @@ function MessageBubble({ message }: { message: ChatMessage }) {
   }
 
   const hasSources = message.sources && message.sources.length > 0
+  const conf = message.confidence
+  const confStyle = conf === 'high'
+    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+    : conf === 'medium'
+    ? 'bg-yellow-50 text-yellow-700 border-yellow-200'
+    : conf === 'low'
+    ? 'bg-red-50 text-red-600 border-red-200'
+    : null
 
   return (
     <div className="flex gap-3">
@@ -148,6 +156,13 @@ function MessageBubble({ message }: { message: ChatMessage }) {
         <div className="bg-white border border-gray-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-800 leading-relaxed">
           {message.content}
         </div>
+        {confStyle && (
+          <div className="flex items-center gap-1.5 px-1">
+            <span className={'text-[10px] font-semibold uppercase tracking-wider border rounded-full px-2 py-0.5 ' + confStyle}>
+              {conf} confidence
+            </span>
+          </div>
+        )}
 
         {hasSources && (
           <div>
