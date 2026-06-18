@@ -3,7 +3,7 @@ import uuid
 from flask import Blueprint, jsonify, request
 from werkzeug.utils import secure_filename
 
-from models import Document, DocumentChunk, DocumentEntity, DocumentPrediction, DocumentSummary, DocumentText, Session, db
+from models import CompanyProfile, Document, DocumentChunk, DocumentEntity, DocumentPrediction, DocumentSummary, DocumentText, EligibilityCheck, Session, db
 from processing import trigger_processing
 from storage import DOCUMENT_BUCKET, delete_file, get_presigned_url, upload_file
 from storage.minio_client import CONTENT_TYPES
@@ -252,6 +252,54 @@ def run_prediction(doc_id: str):
             db.session.add(p)
         db.session.commit()
         return jsonify(p.to_dict()), 200
+    except Exception as exc:
+        db.session.rollback()
+        return jsonify({"error": str(exc)}), 500
+
+
+@documents_bp.route("/documents/<doc_id>/eligibility", methods=["GET"])
+def get_eligibility(doc_id: str):
+    doc = Document.query.get(doc_id)
+    if not doc:
+        return jsonify({"error": "Document not found"}), 404
+    check = EligibilityCheck.query.filter_by(document_id=doc_id).first()
+    if not check:
+        return jsonify({"error": "No eligibility check yet"}), 404
+    return jsonify(check.to_dict()), 200
+
+
+@documents_bp.route("/documents/<doc_id>/eligibility", methods=["POST"])
+def run_eligibility(doc_id: str):
+    doc = Document.query.get(doc_id)
+    if not doc:
+        return jsonify({"error": "Document not found"}), 404
+    if doc.status != "ready":
+        return jsonify({"error": "Document not ready", "status": doc.status}), 409
+
+    profile = CompanyProfile.query.filter_by(session_id=doc.session_id).first()
+    if not profile:
+        return jsonify({"error": "No company profile set up for this session"}), 400
+
+    doc_text = DocumentText.query.filter_by(document_id=doc_id).first()
+    if not doc_text:
+        return jsonify({"error": "No extracted text found"}), 404
+
+    try:
+        from eligibility import check_eligibility
+        result = check_eligibility(doc_text.raw_text, profile.to_dict())
+        check = EligibilityCheck.query.filter_by(document_id=doc_id).first()
+        if check:
+            check.profile_id = profile.id
+            check.score = result["score"]
+            check.met = result["met"]
+            check.missing = result["missing"]
+            check.documents_required = result["documents_required"]
+            check.recommendation = result["recommendation"]
+        else:
+            check = EligibilityCheck(document_id=doc_id, profile_id=profile.id, **result)
+            db.session.add(check)
+        db.session.commit()
+        return jsonify(check.to_dict()), 200
     except Exception as exc:
         db.session.rollback()
         return jsonify({"error": str(exc)}), 500

@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { SearchResult, Session } from '../types'
+import type { CompanyProfile, SearchResult, Session } from '../types'
 
 export async function fetchSessions(): Promise<Session[]> {
   const res = await apiClient.get<Session[]>('/sessions')
@@ -13,6 +13,16 @@ export async function createSession(name: string, description?: string): Promise
 
 export async function deleteSession(id: string): Promise<void> {
   await apiClient.delete(`/sessions/${id}`)
+}
+
+export async function fetchProfile(sessionId: string): Promise<CompanyProfile> {
+  const res = await apiClient.get<CompanyProfile>(`/sessions/${sessionId}/profile`)
+  return res.data
+}
+
+export async function upsertProfile(sessionId: string, data: Partial<CompanyProfile>): Promise<CompanyProfile> {
+  const res = await apiClient.post<CompanyProfile>(`/sessions/${sessionId}/profile`, data)
+  return res.data
 }
 
 export async function searchSession(

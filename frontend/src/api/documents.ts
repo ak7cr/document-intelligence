@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { AnalyticsResult, ComparisonResult, Document, DocumentEntity, DocumentPrediction, DocumentSummary } from '../types'
+import type { AnalyticsResult, ComparisonResult, Document, DocumentEntity, DocumentPrediction, DocumentSummary, EligibilityCheck } from '../types'
 
 export async function fetchDocuments(sessionId: string): Promise<Document[]> {
   const res = await apiClient.get<Document[]>(`/documents/${sessionId}`)
@@ -68,5 +68,15 @@ export async function compareDocuments(sessionId: string, docIds: string[]): Pro
   const res = await apiClient.post<ComparisonResult>(`/sessions/${sessionId}/compare`, {
     doc_ids: docIds,
   })
+  return res.data
+}
+
+export async function fetchEligibility(docId: string): Promise<EligibilityCheck> {
+  const res = await apiClient.get<EligibilityCheck>(`/documents/${docId}/eligibility`)
+  return res.data
+}
+
+export async function runEligibility(docId: string): Promise<EligibilityCheck> {
+  const res = await apiClient.post<EligibilityCheck>(`/documents/${docId}/eligibility`)
   return res.data
 }

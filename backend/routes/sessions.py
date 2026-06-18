@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request
 
-from models import Session, db
+from models import CompanyProfile, Session, db
 from storage import delete_file
 from vector import search_chunks
 
@@ -119,6 +119,46 @@ def compare_session_docs(session_id: str):
         return jsonify({"error": str(exc)}), 400
     except Exception as exc:
         return jsonify({"error": "Comparison failed", "detail": str(exc)}), 500
+
+
+@sessions_bp.route("/sessions/<session_id>/profile", methods=["GET"])
+def get_profile(session_id: str):
+    if not Session.query.get(session_id):
+        return jsonify({"error": "Session not found"}), 404
+    profile = CompanyProfile.query.filter_by(session_id=session_id).first()
+    if not profile:
+        return jsonify({"error": "No profile set up for this session"}), 404
+    return jsonify(profile.to_dict()), 200
+
+
+@sessions_bp.route("/sessions/<session_id>/profile", methods=["POST"])
+def upsert_profile(session_id: str):
+    if not Session.query.get(session_id):
+        return jsonify({"error": "Session not found"}), 404
+    data = request.json or {}
+    profile = CompanyProfile.query.filter_by(session_id=session_id).first()
+    if profile:
+        profile.company_name = data.get("company_name", profile.company_name)
+        profile.annual_turnover = data.get("annual_turnover", profile.annual_turnover)
+        profile.years_in_business = data.get("years_in_business", profile.years_in_business)
+        profile.certifications = data.get("certifications", profile.certifications)
+        profile.similar_projects = data.get("similar_projects", profile.similar_projects)
+        profile.employee_count = data.get("employee_count", profile.employee_count)
+        profile.extra_details = data.get("extra_details", profile.extra_details)
+    else:
+        profile = CompanyProfile(
+            session_id=session_id,
+            company_name=data.get("company_name", ""),
+            annual_turnover=data.get("annual_turnover", ""),
+            years_in_business=data.get("years_in_business"),
+            certifications=data.get("certifications", []),
+            similar_projects=data.get("similar_projects"),
+            employee_count=data.get("employee_count", ""),
+            extra_details=data.get("extra_details", ""),
+        )
+        db.session.add(profile)
+    db.session.commit()
+    return jsonify(profile.to_dict()), 200
 
 
 @sessions_bp.route("/sessions/<session_id>", methods=["DELETE"])

@@ -20,6 +20,9 @@ class Session(db.Model):
     documents = db.relationship(
         "Document", backref="session", lazy=True, cascade="all, delete-orphan"
     )
+    profile = db.relationship(
+        "CompanyProfile", backref="session", uselist=False, cascade="all, delete-orphan"
+    )
 
     def to_dict(self) -> dict:
         return {
@@ -70,6 +73,12 @@ class Document(db.Model):
     )
     prediction = db.relationship(
         "DocumentPrediction",
+        backref="document",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+    eligibility = db.relationship(
+        "EligibilityCheck",
         backref="document",
         uselist=False,
         cascade="all, delete-orphan",
@@ -203,6 +212,78 @@ class DocumentSummary(db.Model):
             "headline": self.headline,
             "summary_text": self.summary_text,
             "key_points": self.key_points or [],
+        }
+
+
+class CompanyProfile(db.Model):
+    __tablename__ = "company_profiles"
+
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    session_id = db.Column(
+        db.String(36),
+        db.ForeignKey("sessions.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
+    company_name = db.Column(db.String(255), nullable=False, default="")
+    annual_turnover = db.Column(db.String(100), nullable=False, default="")
+    years_in_business = db.Column(db.Integer, nullable=True)
+    certifications = db.Column(db.JSON, nullable=False, default=list)
+    similar_projects = db.Column(db.Integer, nullable=True)
+    employee_count = db.Column(db.String(50), nullable=False, default="")
+    extra_details = db.Column(db.Text, nullable=False, default="")
+    created_at = db.Column(db.DateTime, default=_now)
+    updated_at = db.Column(db.DateTime, default=_now, onupdate=_now)
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "session_id": self.session_id,
+            "company_name": self.company_name,
+            "annual_turnover": self.annual_turnover,
+            "years_in_business": self.years_in_business,
+            "certifications": self.certifications or [],
+            "similar_projects": self.similar_projects,
+            "employee_count": self.employee_count,
+            "extra_details": self.extra_details,
+            "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat(),
+        }
+
+
+class EligibilityCheck(db.Model):
+    __tablename__ = "eligibility_checks"
+
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    document_id = db.Column(
+        db.String(36),
+        db.ForeignKey("documents.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
+    profile_id = db.Column(
+        db.String(36),
+        db.ForeignKey("company_profiles.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    score = db.Column(db.Integer, nullable=False, default=0)
+    met = db.Column(db.JSON, nullable=False, default=list)
+    missing = db.Column(db.JSON, nullable=False, default=list)
+    documents_required = db.Column(db.JSON, nullable=False, default=list)
+    recommendation = db.Column(db.Text, nullable=False, default="")
+    created_at = db.Column(db.DateTime, default=_now)
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "document_id": self.document_id,
+            "profile_id": self.profile_id,
+            "score": self.score,
+            "met": self.met or [],
+            "missing": self.missing or [],
+            "documents_required": self.documents_required or [],
+            "recommendation": self.recommendation,
+            "created_at": self.created_at.isoformat(),
         }
 
 

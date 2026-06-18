@@ -110,6 +110,37 @@ export interface ComparisonResult {
   analysis: ComparisonAnalysis
 }
 
+export interface CompanyProfile {
+  id: string
+  session_id: string
+  company_name: string
+  annual_turnover: string
+  years_in_business: number | null
+  certifications: string[]
+  similar_projects: number | null
+  employee_count: string
+  extra_details: string
+  created_at: string
+  updated_at: string
+}
+
+export interface EligibilityDocRequired {
+  name: string
+  status: 'available' | 'required'
+}
+
+export interface EligibilityCheck {
+  id: string
+  document_id: string
+  profile_id: string
+  score: number
+  met: string[]
+  missing: string[]
+  documents_required: EligibilityDocRequired[]
+  recommendation: string
+  created_at: string
+}
+
 export interface ChatSource {
   document_id: string
   filename: string
