@@ -1,4 +1,4 @@
-# Tender Intelligence
+# Document Intelligence
 
 A document intelligence platform for procurement and tender analysis. Upload PDF, Word, Excel, or scanned documents and get AI-powered entity extraction, summarization, risk prediction, semantic search, and multi-document comparison — all in one session-based workspace.
 
