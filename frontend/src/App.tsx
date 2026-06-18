@@ -136,7 +136,7 @@ export default function App() {
             <div className="w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center text-3xl mb-5">
               &#128196;
             </div>
-            <h2 className="text-xl font-semibold text-gray-700 mb-2">Tender Intelligence</h2>
+            <h2 className="text-xl font-semibold text-gray-700 mb-2">Document Intelligence</h2>
             <p className="text-sm text-gray-400 max-w-xs leading-relaxed">
               Create a session from the sidebar, then upload tender documents to begin analysis.
             </p>

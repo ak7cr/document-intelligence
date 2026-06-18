@@ -54,7 +54,7 @@ export default function Sidebar({ activeSessionId, onSessionSelect }: Props) {
             <span className="text-white text-[10px] font-bold tracking-tight">TI</span>
           </div>
           <span className="text-white text-sm font-semibold tracking-tight">
-            Tender Intelligence
+            Document Intelligence
           </span>
         </div>
       </div>
