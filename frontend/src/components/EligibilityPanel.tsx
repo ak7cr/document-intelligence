@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { fetchDocuments } from '../api/documents'
 import { fetchProfile, upsertProfile } from '../api/sessions'
-import { fetchEligibility, runEligibility } from '../api/documents'
-import type { CompanyProfile, EligibilityCheck, EligibilityDocRequired } from '../types'
+import { fetchEligibility, runEligibility, fetchChecklist, runChecklist } from '../api/documents'
+import type { ChecklistItem, CompanyProfile, DocumentChecklist, EligibilityCheck, EligibilityDocRequired } from '../types'
 
 interface Props {
   sessionId: string
@@ -411,6 +411,114 @@ function DocumentEligibilityCard({ docId, filename }: { docId: string; filename:
               <p className="text-xs text-gray-700 leading-relaxed">{check.recommendation}</p>
             </div>
           )}
+
+          {/* Bid Submission Checklist */}
+          <ChecklistSection docId={docId} />
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Bid Submission Checklist ──────────────────────────────────────────────────
+
+const CAT_COLORS: Record<string, string> = {
+  Technical: 'bg-purple-50 text-purple-700 border-purple-200',
+  Financial: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  Legal: 'bg-red-50 text-red-700 border-red-200',
+  Administrative: 'bg-blue-50 text-blue-700 border-blue-200',
+}
+
+const CATEGORIES = ['Technical', 'Financial', 'Legal', 'Administrative'] as const
+
+function ChecklistSection({ docId }: { docId: string }) {
+  const qc = useQueryClient()
+
+  const { data: cl, isLoading, isError } = useQuery<DocumentChecklist>({
+    queryKey: ['checklist', docId],
+    queryFn: () => fetchChecklist(docId),
+    retry: false,
+    staleTime: 10 * 60 * 1000,
+  })
+
+  const genMut = useMutation({
+    mutationFn: () => runChecklist(docId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['checklist', docId] }),
+  })
+
+  const noChecklist = !isLoading && (isError || !cl)
+
+  const grouped = cl
+    ? CATEGORIES.reduce<Record<string, ChecklistItem[]>>((acc, cat) => {
+        acc[cat] = (cl.items || []).filter((i) => i.category === cat)
+        return acc
+      }, {} as Record<string, ChecklistItem[]>)
+    : {}
+
+  return (
+    <div className="border-t border-gray-100 pt-4">
+      <div className="flex items-center justify-between mb-3">
+        <h4 className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">
+          Bid Submission Checklist
+        </h4>
+        {cl && (
+          <button
+            onClick={() => genMut.mutate()}
+            disabled={genMut.isPending}
+            className="text-[10px] text-gray-400 hover:text-gray-600 transition disabled:opacity-50"
+          >
+            {genMut.isPending ? 'Regenerating...' : 'Regenerate'}
+          </button>
+        )}
+      </div>
+
+      {isLoading && <p className="text-xs text-gray-400">Loading...</p>}
+
+      {noChecklist && (
+        <div className="flex items-center gap-3">
+          <p className="text-xs text-gray-400 flex-1">
+            Generate a document checklist from this tender
+          </p>
+          <button
+            onClick={() => genMut.mutate()}
+            disabled={genMut.isPending}
+            className="text-xs px-3 py-1.5 bg-purple-50 text-purple-700 border border-purple-200 rounded-lg hover:bg-purple-100 transition disabled:opacity-50"
+          >
+            {genMut.isPending ? 'Generating...' : 'Generate Checklist'}
+          </button>
+          {genMut.isError && <span className="text-xs text-red-500">Failed</span>}
+        </div>
+      )}
+
+      {cl && cl.items.length === 0 && (
+        <p className="text-xs text-gray-400">No checklist items extracted from this document.</p>
+      )}
+
+      {cl && cl.items.length > 0 && (
+        <div className="space-y-3">
+          {CATEGORIES.filter((cat) => grouped[cat]?.length > 0).map((cat) => (
+            <div key={cat}>
+              <p className={'inline-flex text-[10px] font-semibold uppercase tracking-wider border rounded-full px-2 py-0.5 mb-1.5 ' + CAT_COLORS[cat]}>
+                {cat}
+              </p>
+              <ul className="space-y-1.5">
+                {grouped[cat].map((item, i) => (
+                  <li key={i} className="flex items-start gap-2">
+                    <span className={
+                      'shrink-0 mt-0.5 text-[10px] font-medium border rounded px-1 ' +
+                      (item.status === 'required' ? 'bg-orange-50 text-orange-700 border-orange-200' : 'bg-gray-50 text-gray-500 border-gray-200')
+                    }>
+                      {item.status === 'required' ? 'REQ' : 'OPT'}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-gray-800 leading-snug">{item.name}</p>
+                      {item.notes && <p className="text-[11px] text-gray-400 leading-relaxed mt-0.5">{item.notes}</p>}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </div>
       )}
     </div>

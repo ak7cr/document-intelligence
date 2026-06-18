@@ -9,10 +9,11 @@ import ComparePanel from './components/ComparePanel'
 import AnalyticsPanel from './components/AnalyticsPanel'
 import PredictionsPanel from './components/PredictionsPanel'
 import EligibilityPanel from './components/EligibilityPanel'
+import TimelinePanel from './components/TimelinePanel'
 import { fetchSessions } from './api/sessions'
 import { exportJson, exportCsv, exportXlsx } from './api/export'
 
-type Tab = 'documents' | 'chat' | 'compare' | 'analytics' | 'predictions' | 'eligibility'
+type Tab = 'documents' | 'chat' | 'compare' | 'analytics' | 'predictions' | 'eligibility' | 'timeline'
 
 export default function App() {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
@@ -72,6 +73,7 @@ export default function App() {
                     <TabButton label="Analytics" active={tab === 'analytics'} onClick={() => setTab('analytics')} />
                     <TabButton label="Predictions" active={tab === 'predictions'} onClick={() => setTab('predictions')} />
                     <TabButton label="Eligibility" active={tab === 'eligibility'} onClick={() => setTab('eligibility')} />
+                    <TabButton label="Timeline" active={tab === 'timeline'} onClick={() => setTab('timeline')} />
                   </div>
                 </div>
 
@@ -123,6 +125,10 @@ export default function App() {
             ) : tab === 'eligibility' ? (
               <div className="flex-1 overflow-y-auto">
                 <EligibilityPanel sessionId={activeSession.id} />
+              </div>
+            ) : tab === 'timeline' ? (
+              <div className="flex-1 overflow-y-auto">
+                <TimelinePanel sessionId={activeSession.id} />
               </div>
             ) : (
               <div className="flex-1 overflow-y-auto p-8 space-y-6">

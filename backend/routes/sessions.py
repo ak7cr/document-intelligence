@@ -161,6 +161,65 @@ def upsert_profile(session_id: str):
     return jsonify(profile.to_dict()), 200
 
 
+@sessions_bp.route("/sessions/<session_id>/timeline", methods=["GET"])
+def session_timeline(session_id: str):
+    from datetime import date, datetime
+    from models import Document, DocumentEntity
+
+    if not Session.query.get(session_id):
+        return jsonify({"error": "Session not found"}), 404
+
+    docs = Document.query.filter_by(session_id=session_id, status="ready").all()
+    doc_map = {d.id: d.filename for d in docs}
+
+    entities = DocumentEntity.query.filter(
+        DocumentEntity.document_id.in_(list(doc_map.keys())),
+        DocumentEntity.entity_type.in_(["date", "deadline"]),
+    ).all()
+
+    today = date.today()
+    items = []
+    for ent in entities:
+        parsed_date = None
+        try:
+            from dateutil import parser as dateparser
+            parsed_date = dateparser.parse(
+                ent.value,
+                default=datetime(today.year, today.month, today.day),
+            ).date()
+        except Exception:
+            pass
+
+        days_from_now = None
+        urgency = "unknown"
+        if parsed_date:
+            days_from_now = (parsed_date - today).days
+            if days_from_now < 0:
+                urgency = "past"
+            elif days_from_now <= 7:
+                urgency = "critical"
+            elif days_from_now <= 30:
+                urgency = "soon"
+            else:
+                urgency = "future"
+
+        items.append({
+            "entity_id": ent.id,
+            "document_id": ent.document_id,
+            "filename": doc_map.get(ent.document_id, ""),
+            "label": ent.label,
+            "value": ent.value,
+            "entity_type": ent.entity_type,
+            "parsed_date": parsed_date.isoformat() if parsed_date else None,
+            "days_from_now": days_from_now,
+            "urgency": urgency,
+        })
+
+    items.sort(key=lambda x: (x["parsed_date"] is None, x["parsed_date"] or "9999-99-99"))
+
+    return jsonify({"session_id": session_id, "items": items}), 200
+
+
 @sessions_bp.route("/sessions/<session_id>", methods=["DELETE"])
 def delete_session(session_id: str):
     session_obj = Session.query.get(session_id)

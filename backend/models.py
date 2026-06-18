@@ -83,6 +83,12 @@ class Document(db.Model):
         uselist=False,
         cascade="all, delete-orphan",
     )
+    checklist = db.relationship(
+        "DocumentChecklist",
+        backref="document",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
 
     def to_dict(self) -> dict:
         data: dict = {
@@ -283,6 +289,28 @@ class EligibilityCheck(db.Model):
             "missing": self.missing or [],
             "documents_required": self.documents_required or [],
             "recommendation": self.recommendation,
+            "created_at": self.created_at.isoformat(),
+        }
+
+
+class DocumentChecklist(db.Model):
+    __tablename__ = "document_checklists"
+
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    document_id = db.Column(
+        db.String(36),
+        db.ForeignKey("documents.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
+    items = db.Column(db.JSON, nullable=False, default=list)
+    created_at = db.Column(db.DateTime, default=_now)
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "document_id": self.document_id,
+            "items": self.items or [],
             "created_at": self.created_at.isoformat(),
         }
 

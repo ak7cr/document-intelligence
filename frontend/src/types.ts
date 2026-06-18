@@ -141,6 +141,32 @@ export interface EligibilityCheck {
   created_at: string
 }
 
+export interface ChecklistItem {
+  name: string
+  category: 'Technical' | 'Financial' | 'Legal' | 'Administrative'
+  status: 'required' | 'optional'
+  notes: string
+}
+
+export interface DocumentChecklist {
+  id: string
+  document_id: string
+  items: ChecklistItem[]
+  created_at: string
+}
+
+export interface TimelineItem {
+  entity_id: string
+  document_id: string
+  filename: string
+  label: string
+  value: string
+  entity_type: string
+  parsed_date: string | null
+  days_from_now: number | null
+  urgency: 'past' | 'critical' | 'soon' | 'future' | 'unknown'
+}
+
 export interface ChatSource {
   document_id: string
   filename: string

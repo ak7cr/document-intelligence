@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { AnalyticsResult, ComparisonResult, Document, DocumentEntity, DocumentPrediction, DocumentSummary, EligibilityCheck } from '../types'
+import type { AnalyticsResult, ComparisonResult, Document, DocumentChecklist, DocumentEntity, DocumentPrediction, DocumentSummary, EligibilityCheck } from '../types'
 
 export async function fetchDocuments(sessionId: string): Promise<Document[]> {
   const res = await apiClient.get<Document[]>(`/documents/${sessionId}`)
@@ -78,5 +78,15 @@ export async function fetchEligibility(docId: string): Promise<EligibilityCheck>
 
 export async function runEligibility(docId: string): Promise<EligibilityCheck> {
   const res = await apiClient.post<EligibilityCheck>(`/documents/${docId}/eligibility`)
+  return res.data
+}
+
+export async function fetchChecklist(docId: string): Promise<DocumentChecklist> {
+  const res = await apiClient.get<DocumentChecklist>(`/documents/${docId}/checklist`)
+  return res.data
+}
+
+export async function runChecklist(docId: string): Promise<DocumentChecklist> {
+  const res = await apiClient.post<DocumentChecklist>(`/documents/${docId}/checklist`)
   return res.data
 }

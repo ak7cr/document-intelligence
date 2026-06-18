@@ -3,7 +3,7 @@ import uuid
 from flask import Blueprint, jsonify, request
 from werkzeug.utils import secure_filename
 
-from models import CompanyProfile, Document, DocumentChunk, DocumentEntity, DocumentPrediction, DocumentSummary, DocumentText, EligibilityCheck, Session, db
+from models import CompanyProfile, Document, DocumentChunk, DocumentChecklist, DocumentEntity, DocumentPrediction, DocumentSummary, DocumentText, EligibilityCheck, Session, db
 from processing import trigger_processing
 from storage import DOCUMENT_BUCKET, delete_file, get_presigned_url, upload_file
 from storage.minio_client import CONTENT_TYPES
@@ -300,6 +300,44 @@ def run_eligibility(doc_id: str):
             db.session.add(check)
         db.session.commit()
         return jsonify(check.to_dict()), 200
+    except Exception as exc:
+        db.session.rollback()
+        return jsonify({"error": str(exc)}), 500
+
+
+@documents_bp.route("/documents/<doc_id>/checklist", methods=["GET"])
+def get_checklist(doc_id: str):
+    doc = Document.query.get(doc_id)
+    if not doc:
+        return jsonify({"error": "Document not found"}), 404
+    cl = DocumentChecklist.query.filter_by(document_id=doc_id).first()
+    if not cl:
+        return jsonify({"error": "No checklist yet"}), 404
+    return jsonify(cl.to_dict()), 200
+
+
+@documents_bp.route("/documents/<doc_id>/checklist", methods=["POST"])
+def run_checklist(doc_id: str):
+    doc = Document.query.get(doc_id)
+    if not doc:
+        return jsonify({"error": "Document not found"}), 404
+    if doc.status != "ready":
+        return jsonify({"error": "Document not ready", "status": doc.status}), 409
+    doc_text = DocumentText.query.filter_by(document_id=doc_id).first()
+    if not doc_text:
+        return jsonify({"error": "No extracted text found"}), 404
+
+    try:
+        from checklist import build_checklist
+        result = build_checklist(doc_text.raw_text)
+        cl = DocumentChecklist.query.filter_by(document_id=doc_id).first()
+        if cl:
+            cl.items = result["items"]
+        else:
+            cl = DocumentChecklist(document_id=doc_id, items=result["items"])
+            db.session.add(cl)
+        db.session.commit()
+        return jsonify(cl.to_dict()), 200
     except Exception as exc:
         db.session.rollback()
         return jsonify({"error": str(exc)}), 500
