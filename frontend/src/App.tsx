@@ -10,10 +10,12 @@ import AnalyticsPanel from './components/AnalyticsPanel'
 import PredictionsPanel from './components/PredictionsPanel'
 import EligibilityPanel from './components/EligibilityPanel'
 import TimelinePanel from './components/TimelinePanel'
+import EntityGraphPanel from './components/EntityGraphPanel'
+import OcrReviewBanner from './components/OcrReviewBanner'
 import { fetchSessions } from './api/sessions'
 import { exportJson, exportCsv, exportXlsx } from './api/export'
 
-type Tab = 'documents' | 'chat' | 'compare' | 'analytics' | 'predictions' | 'eligibility' | 'timeline'
+type Tab = 'documents' | 'chat' | 'compare' | 'analytics' | 'predictions' | 'eligibility' | 'timeline' | 'graph'
 
 export default function App() {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
@@ -74,6 +76,7 @@ export default function App() {
                     <TabButton label="Predictions" active={tab === 'predictions'} onClick={() => setTab('predictions')} />
                     <TabButton label="Eligibility" active={tab === 'eligibility'} onClick={() => setTab('eligibility')} />
                     <TabButton label="Timeline" active={tab === 'timeline'} onClick={() => setTab('timeline')} />
+                    <TabButton label="Graph" active={tab === 'graph'} onClick={() => setTab('graph')} />
                   </div>
                 </div>
 
@@ -130,6 +133,10 @@ export default function App() {
               <div className="flex-1 overflow-y-auto">
                 <TimelinePanel sessionId={activeSession.id} />
               </div>
+            ) : tab === 'graph' ? (
+              <div className="flex-1 overflow-y-auto">
+                <EntityGraphPanel sessionId={activeSession.id} />
+              </div>
             ) : (
               <div className="flex-1 overflow-y-auto p-8 space-y-6">
                 {isSearching ? (
@@ -137,6 +144,7 @@ export default function App() {
                 ) : (
                   <>
                     <UploadZone sessionId={activeSession.id} />
+                    <OcrReviewBanner sessionId={activeSession.id} />
                     <DocumentList sessionId={activeSession.id} />
                   </>
                 )}

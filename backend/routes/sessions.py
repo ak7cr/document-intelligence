@@ -4,6 +4,8 @@ from models import CompanyProfile, Session, db
 from storage import delete_file
 from vector import search_chunks
 
+OCR_CONFIDENCE_THRESHOLD = 0.70
+
 sessions_bp = Blueprint("sessions", __name__)
 
 
@@ -159,6 +161,147 @@ def upsert_profile(session_id: str):
         db.session.add(profile)
     db.session.commit()
     return jsonify(profile.to_dict()), 200
+
+
+@sessions_bp.route("/sessions/<session_id>/ocr-review", methods=["GET"])
+def ocr_review(session_id: str):
+    from models import Document, DocumentText
+
+    if not Session.query.get(session_id):
+        return jsonify({"error": "Session not found"}), 404
+
+    docs = Document.query.filter_by(session_id=session_id, status="ready").all()
+    items = []
+    for doc in docs:
+        dt = DocumentText.query.filter_by(document_id=doc.id).first()
+        if not dt or dt.method != "ocr":
+            continue
+        confidence = dt.ocr_confidence
+        if confidence is None or confidence < OCR_CONFIDENCE_THRESHOLD:
+            items.append({
+                "document_id": doc.id,
+                "filename": doc.filename,
+                "method": dt.method,
+                "ocr_confidence": confidence,
+                "page_count": dt.page_count,
+                "word_count": dt.word_count,
+            })
+
+    items.sort(key=lambda x: (x["ocr_confidence"] or 0.0))
+    return jsonify({"session_id": session_id, "items": items, "threshold": OCR_CONFIDENCE_THRESHOLD}), 200
+
+
+@sessions_bp.route("/sessions/<session_id>/entity-graph", methods=["GET"])
+def entity_graph(session_id: str):
+    from collections import defaultdict
+    from models import Document, DocumentEntity
+
+    if not Session.query.get(session_id):
+        return jsonify({"error": "Session not found"}), 404
+
+    docs = Document.query.filter_by(session_id=session_id, status="ready").all()
+    if not docs:
+        return jsonify({"session_id": session_id, "clusters": [], "total_shared": 0}), 200
+
+    doc_map = {d.id: d.filename for d in docs}
+    doc_ids = list(doc_map.keys())
+
+    entities = DocumentEntity.query.filter(
+        DocumentEntity.document_id.in_(doc_ids),
+        DocumentEntity.entity_type != "doc_type",
+    ).all()
+
+    # Group by (type, normalized value)
+    groups: dict[tuple, list] = defaultdict(list)
+    for e in entities:
+        key = (e.entity_type, e.value.lower().strip())
+        groups[key].append(e)
+
+    clusters = []
+    for (etype, _), ents in groups.items():
+        unique_docs = {e.document_id for e in ents}
+        if len(unique_docs) < 2:
+            continue
+        doc_entries = []
+        seen = set()
+        for e in ents:
+            if e.document_id not in seen:
+                seen.add(e.document_id)
+                doc_entries.append({
+                    "id": e.document_id,
+                    "filename": doc_map.get(e.document_id, ""),
+                    "label": e.label,
+                })
+        clusters.append({
+            "entity_type": etype,
+            "value": ents[0].value,
+            "doc_count": len(unique_docs),
+            "documents": doc_entries,
+        })
+
+    clusters.sort(key=lambda x: (-x["doc_count"], x["entity_type"]))
+
+    return jsonify({
+        "session_id": session_id,
+        "clusters": clusters,
+        "total_shared": len(clusters),
+    }), 200
+
+
+@sessions_bp.route("/sessions/<session_id>/run-analysis", methods=["POST"])
+def run_session_analysis(session_id: str):
+    """Agentic: run checklist + eligibility on all ready docs that haven't been checked yet."""
+    from models import CompanyProfile, Document, DocumentChecklist, DocumentText, EligibilityCheck
+
+    if not Session.query.get(session_id):
+        return jsonify({"error": "Session not found"}), 404
+
+    docs = Document.query.filter_by(session_id=session_id, status="ready").all()
+    profile = CompanyProfile.query.filter_by(session_id=session_id).first()
+
+    checklist_count = 0
+    eligibility_count = 0
+    errors = []
+
+    for doc in docs:
+        dt = DocumentText.query.filter_by(document_id=doc.id).first()
+        if not dt:
+            continue
+
+        # Checklist
+        existing_cl = DocumentChecklist.query.filter_by(document_id=doc.id).first()
+        if not existing_cl:
+            try:
+                from checklist import build_checklist
+                from models import db
+                cl_result = build_checklist(dt.raw_text)
+                db.session.add(DocumentChecklist(document_id=doc.id, items=cl_result["items"]))
+                db.session.commit()
+                checklist_count += 1
+            except Exception as exc:
+                db.session.rollback()
+                errors.append(f"{doc.filename}: checklist failed — {exc}")
+
+        # Eligibility
+        if profile:
+            existing_elig = EligibilityCheck.query.filter_by(document_id=doc.id).first()
+            if not existing_elig:
+                try:
+                    from eligibility import check_eligibility
+                    from models import db
+                    elig_result = check_eligibility(dt.raw_text, profile.to_dict())
+                    db.session.add(EligibilityCheck(document_id=doc.id, profile_id=profile.id, **elig_result))
+                    db.session.commit()
+                    eligibility_count += 1
+                except Exception as exc:
+                    db.session.rollback()
+                    errors.append(f"{doc.filename}: eligibility failed — {exc}")
+
+    return jsonify({
+        "checklist_run": checklist_count,
+        "eligibility_run": eligibility_count,
+        "errors": errors,
+    }), 200
 
 
 @sessions_bp.route("/sessions/<session_id>/timeline", methods=["GET"])

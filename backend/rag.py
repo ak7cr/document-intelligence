@@ -8,9 +8,11 @@ over noisy raw text for factual questions (dates, amounts, parties, risk).
 import os
 
 from llm.client import generate
+from reranker import rerank
 from vector.store import search_chunks
 
 TOP_K = int(os.getenv("RAG_TOP_K", "5"))
+_RERANK_FETCH = TOP_K * 3  # fetch more candidates, rerank, keep TOP_K
 
 _SYSTEM_PROMPT = (
     "You are a tender document analyst. "
@@ -145,9 +147,10 @@ def answer_question(session_id: str, question: str) -> dict:
     """Retrieve structured facts + top-K chunks, build a grounded prompt, return answer."""
 
     verified_facts = _fetch_verified_facts(session_id)
-    chunks = search_chunks(question, session_id=session_id, top_k=TOP_K)
+    candidates = search_chunks(question, session_id=session_id, top_k=_RERANK_FETCH)
+    chunks = rerank(question, candidates)[:TOP_K]
 
-    if not chunks and not verified_facts:
+    if not candidates and not verified_facts:
         return {
             "answer": (
                 "No indexed documents found for this session. "

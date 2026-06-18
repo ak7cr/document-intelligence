@@ -5,7 +5,7 @@ import logging
 from analyzer import analyze_document
 from celery_app import celery
 from chunker import chunk_text
-from models import Document, DocumentChunk, DocumentEntity, DocumentPrediction, DocumentSummary, DocumentText, db
+from models import CompanyProfile, Document, DocumentChunk, DocumentChecklist, DocumentEntity, DocumentPrediction, DocumentSummary, DocumentText, EligibilityCheck, db
 from processors import dispatch
 from qdrant_client.models import PointStruct
 from storage.minio_client import get_client
@@ -159,6 +159,39 @@ def _process(task, doc_id: str) -> None:
 
         except Exception:
             logger.exception("Combined analysis failed for document %s — skipping", doc_id)
+
+        # ── Agentic: auto-generate bid checklist ──────────────────────────
+        try:
+            from checklist import build_checklist
+            cl_result = build_checklist(result.text)
+            existing_cl = DocumentChecklist.query.filter_by(document_id=doc_id).first()
+            if existing_cl:
+                existing_cl.items = cl_result["items"]
+            else:
+                db.session.add(DocumentChecklist(document_id=doc_id, items=cl_result["items"]))
+            logger.info("Checklist auto-generated for document %s (%d items)", doc_id, len(cl_result["items"]))
+        except Exception:
+            logger.exception("Auto-checklist failed for document %s — skipping", doc_id)
+
+        # ── Agentic: auto-run eligibility check if profile exists ─────────
+        try:
+            profile = CompanyProfile.query.filter_by(session_id=doc.session_id).first()
+            if profile:
+                from eligibility import check_eligibility
+                elig_result = check_eligibility(result.text, profile.to_dict())
+                existing_elig = EligibilityCheck.query.filter_by(document_id=doc_id).first()
+                if existing_elig:
+                    existing_elig.profile_id = profile.id
+                    existing_elig.score = elig_result["score"]
+                    existing_elig.met = elig_result["met"]
+                    existing_elig.missing = elig_result["missing"]
+                    existing_elig.documents_required = elig_result["documents_required"]
+                    existing_elig.recommendation = elig_result["recommendation"]
+                else:
+                    db.session.add(EligibilityCheck(document_id=doc_id, profile_id=profile.id, **elig_result))
+                logger.info("Eligibility auto-checked for document %s: score=%d", doc_id, elig_result["score"])
+        except Exception:
+            logger.exception("Auto-eligibility failed for document %s — skipping", doc_id)
 
         doc.status = "ready"
         db.session.commit()

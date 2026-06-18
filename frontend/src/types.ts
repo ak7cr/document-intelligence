@@ -141,6 +141,34 @@ export interface EligibilityCheck {
   created_at: string
 }
 
+export interface OcrReviewItem {
+  document_id: string
+  filename: string
+  method: string
+  ocr_confidence: number | null
+  page_count: number | null
+  word_count: number | null
+}
+
+export interface EntityClusterDoc {
+  id: string
+  filename: string
+  label: string
+}
+
+export interface EntityCluster {
+  entity_type: string
+  value: string
+  doc_count: number
+  documents: EntityClusterDoc[]
+}
+
+export interface EntityGraph {
+  session_id: string
+  clusters: EntityCluster[]
+  total_shared: number
+}
+
 export interface ChecklistItem {
   name: string
   category: 'Technical' | 'Financial' | 'Legal' | 'Administrative'
