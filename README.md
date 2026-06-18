@@ -1,6 +1,6 @@
 # Document Intelligence
 
-A document intelligence platform for procurement and tender analysis. Upload PDF, Word, Excel, or scanned documents and get AI-powered entity extraction, summarization, risk prediction, semantic search, and multi-document comparison — all in one session-based workspace.
+A document intelligence platform for document analysis. Upload PDF, Word, Excel, or scanned documents and get AI-powered entity extraction, summarization, risk prediction, semantic search, and multi-document comparison — all in one session-based workspace.
 
 ---
 
@@ -17,7 +17,7 @@ A document intelligence platform for procurement and tender analysis. Upload PDF
 - **Risk prediction** — low/medium/high risk level, confidence score, timeline urgency, risk factors, opportunities, recommended actions
 
 ### Session Workspace
-- **Sessions** organize documents into projects (e.g. one session per tender)
+- **Sessions** organize documents into projects (e.g. one session per document)
 - **Semantic search** — vector search across all documents in a session (RAG with source citations)
 - **Chat** — ask questions about documents; answers are grounded with `[Source N]` citations and page number estimates
 - **Multi-document comparison** — compare 2–8 documents side-by-side with AI-generated differences table, similarities, and recommendation
