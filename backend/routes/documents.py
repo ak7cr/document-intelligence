@@ -350,6 +350,8 @@ def delete_document(doc_id: str):
         return jsonify({"error": "Document not found"}), 404
     if doc.bucket and doc.object_key:
         delete_file(doc.bucket, doc.object_key)
+    from vector import delete_doc_vectors
+    delete_doc_vectors(doc_id)
     db.session.delete(doc)
     db.session.commit()
     return jsonify({"message": f"Document {doc_id} deleted"}), 200
