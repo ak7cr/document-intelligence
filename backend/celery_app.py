@@ -5,17 +5,9 @@ which is called inside create_app().  Tasks import `celery` from this module
 and access the Flask app via `celery.flask_app` (set by init_celery).
 """
 
-import platform
-
 from celery import Celery
 
 celery = Celery("document_intelligence")
-
-# macOS kills forked children that inherit multi-threaded C extensions
-# (PyMuPDF, PaddleOCR, pandas, PyTorch all trigger this).
-# The solo pool runs tasks in the main worker process without forking,
-# which is safe for development.  On Linux, prefork is fine.
-_ON_MACOS = platform.system() == "Darwin"
 
 
 def init_celery(flask_app) -> None:  # type: ignore[no-untyped-def]
@@ -39,8 +31,9 @@ def init_celery(flask_app) -> None:  # type: ignore[no-untyped-def]
         # Prevent worker from prefetching more tasks than it can handle
         worker_prefetch_multiplier=1,
         task_acks_late=True,
-        # solo pool avoids fork() on macOS where C extensions (PyMuPDF,
-        # PaddleOCR, pandas, PyTorch) cause SIGABRT/SIGSEGV in child procs.
-        # On Linux, prefork is safe and should be used in production.
-        worker_pool="solo" if _ON_MACOS else "prefork",
+        # PaddlePaddle's C++ inference engine (AnalysisPredictor) cannot
+        # survive fork() — it SIGSEGV's in CreateVariables on both macOS and
+        # Linux. The solo pool runs tasks in the main process (no fork) and is
+        # the only safe choice until PaddlePaddle adds fork-safe initialisation.
+        worker_pool="solo",
     )
