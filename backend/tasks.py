@@ -4,7 +4,9 @@ import logging
 
 from analyzer import analyze_document
 from celery_app import celery
+from checklist import build_checklist
 from chunker import chunk_text
+from eligibility import check_eligibility
 from models import CompanyProfile, Document, DocumentChunk, DocumentChecklist, DocumentEntity, DocumentPrediction, DocumentSummary, DocumentText, EligibilityCheck, db
 from processors import dispatch
 from qdrant_client.models import PointStruct
@@ -162,7 +164,6 @@ def _process(task, doc_id: str) -> None:
 
         # ── Agentic: auto-generate bid checklist ──────────────────────────
         try:
-            from checklist import build_checklist
             cl_result = build_checklist(result.text)
             existing_cl = DocumentChecklist.query.filter_by(document_id=doc_id).first()
             if existing_cl:
@@ -177,7 +178,6 @@ def _process(task, doc_id: str) -> None:
         try:
             profile = CompanyProfile.query.filter_by(session_id=doc.session_id).first()
             if profile:
-                from eligibility import check_eligibility
                 elig_result = check_eligibility(result.text, profile.to_dict())
                 existing_elig = EligibilityCheck.query.filter_by(document_id=doc_id).first()
                 if existing_elig:

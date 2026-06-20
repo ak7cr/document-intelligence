@@ -100,15 +100,27 @@ def _call_ollama(prompt: str) -> str:
 
 def _parse(raw: str) -> dict:
     text = raw.strip()
+
+    # Strip markdown fences
     fence = re.search(r"```(?:json)?\s*([\s\S]*?)```", text)
     if fence:
         text = fence.group(1).strip()
 
+    # Try direct parse
     try:
         data = json.loads(text)
     except (json.JSONDecodeError, TypeError):
-        logger.warning("analyze_document: could not parse LLM JSON output")
-        return _empty()
+        # Fallback: extract the first {...} block from the raw output
+        match = re.search(r"\{[\s\S]*\}", text)
+        if match:
+            try:
+                data = json.loads(match.group(0))
+            except (json.JSONDecodeError, TypeError):
+                logger.warning("analyze_document: could not parse LLM JSON output")
+                return _empty()
+        else:
+            logger.warning("analyze_document: could not parse LLM JSON output")
+            return _empty()
 
     risk_level = str(data.get("risk_level", "unknown")).lower().strip()
     if risk_level not in ("low", "medium", "high"):
