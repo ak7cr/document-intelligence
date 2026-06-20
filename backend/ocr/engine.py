@@ -31,6 +31,14 @@ def _get_ocr():
             ) from exc
 
         import paddle
+
+        # PaddleX 3.7.x calls AnalysisConfig.set_optimization_level() which was
+        # removed in PaddlePaddle 3.3.x. Patch it before pipeline init.
+        _cfg = paddle.base.libpaddle.AnalysisConfig
+        if not hasattr(_cfg, "set_optimization_level"):
+            _cfg.set_optimization_level = lambda *_: None
+            logger.debug("Patched AnalysisConfig.set_optimization_level (PaddlePaddle 3.3.x compat)")
+
         if paddle.is_compiled_with_cuda() and paddle.device.cuda.device_count() > 0:
             device = "gpu:0"
             logger.info("GPU detected — initialising PaddleOCR on CUDA")
