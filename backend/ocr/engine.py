@@ -47,7 +47,7 @@ def _get_ocr():
             logger.info("No GPU detected — initialising PaddleOCR on CPU")
 
         _ocr = PaddleOCR(
-            use_textline_orientation=True,
+            use_textline_orientation=False,
             lang="en",
             device=device,
         )
