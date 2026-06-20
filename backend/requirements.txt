@@ -1,6 +1,5 @@
 Flask
 Flask-SQLAlchemy
-flask-cors
 psycopg2-binary
 python-dotenv
 pgvector
@@ -10,15 +9,18 @@ python-docx
 openpyxl
 pandas
 xlrd
+python-dateutil
+
+# PaddleOCR — CPU build (default).
+# For GPU support, replace the two lines below with:
+#   pip install paddlepaddle-gpu paddleocr
+# GPU is auto-detected at runtime; no code change needed.
 paddlepaddle
 paddleocr
+
 Pillow
 celery[redis]
 sentence-transformers
 qdrant-client
 google-genai
 ollama
-langchain-ollama
-llama-index-llms-ollama
-openai
-

@@ -30,12 +30,20 @@ def _get_ocr():
                 "paddleocr is not installed. Run: pip install paddlepaddle paddleocr"
             ) from exc
 
-        logger.info("Initialising PaddleOCR (first run downloads models)…")
+        import paddle
+        if paddle.is_compiled_with_cuda() and paddle.device.cuda.device_count() > 0:
+            device = "gpu:0"
+            logger.info("GPU detected — initialising PaddleOCR on CUDA")
+        else:
+            device = "cpu"
+            logger.info("No GPU detected — initialising PaddleOCR on CPU")
+
         _ocr = PaddleOCR(
             use_textline_orientation=True,
             lang="en",
+            device=device,
         )
-        logger.info("PaddleOCR ready")
+        logger.info("PaddleOCR ready on %s", device)
     return _ocr
 
 
