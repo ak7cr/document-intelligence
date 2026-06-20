@@ -1,11 +1,10 @@
 import json
 import logging
-import os
+import re
 
-from google import genai
+from llm.client import generate
 
 logger = logging.getLogger(__name__)
-_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
 
 _VALID_CATS = {"Technical", "Financial", "Legal", "Administrative"}
 _VALID_STATUSES = {"required", "optional"}
@@ -13,7 +12,6 @@ _VALID_STATUSES = {"required", "optional"}
 
 def build_checklist(tender_text: str) -> dict:
     """Extract bid submission checklist items from tender text."""
-    client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
     prompt = f"""Analyze this tender document and extract a comprehensive bid submission checklist.
 
 For each item a bidder must prepare or submit, identify:
@@ -37,14 +35,16 @@ TENDER DOCUMENT:
 """
 
     try:
-        resp = client.models.generate_content(model=_MODEL, contents=prompt)
-        raw = resp.text.strip()
-        if raw.startswith("```"):
-            raw = raw.split("```", 2)[1]
-            if raw.startswith("json"):
-                raw = raw[4:]
-            raw = raw.rsplit("```", 1)[0]
-        data = json.loads(raw.strip())
+        raw = generate(prompt)
+        text = raw.strip()
+        fence = re.search(r"```(?:json)?\s*([\s\S]*?)```", text)
+        if fence:
+            text = fence.group(1).strip()
+        try:
+            data = json.loads(text)
+        except (json.JSONDecodeError, TypeError):
+            match = re.search(r"\{[\s\S]*\}", text)
+            data = json.loads(match.group(0)) if match else {}
         items = data.get("items", [])
         valid = []
         for item in items:
