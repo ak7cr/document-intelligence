@@ -37,7 +37,7 @@ def _get_reader():
             use_gpu = False
 
         logger.info("Initialising EasyOCR (first run downloads models)… GPU=%s", use_gpu)
-        _reader = easyocr.Reader(["en"], gpu=use_gpu)
+        _reader = easyocr.Reader(["en", "hi"], gpu=use_gpu)
         logger.info("EasyOCR ready")
     return _reader
 
