@@ -42,8 +42,50 @@ def _get_reader():
     return _reader
 
 
+_TILE_HEIGHT = 1000   # px — max strip height fed to CRAFT at once
+_TILE_OVERLAP = 80    # px — overlap between strips to avoid cutting text
+_MIN_CONF = 0.4
+_CANVAS_SIZE = 1920   # CRAFT detection canvas cap
+
+
+def _tile(img_array: np.ndarray) -> list[np.ndarray]:
+    """Split a tall image into overlapping horizontal strips."""
+    h = img_array.shape[0]
+    if h <= _TILE_HEIGHT:
+        return [img_array]
+    strips = []
+    step = _TILE_HEIGHT - _TILE_OVERLAP
+    y = 0
+    while y < h:
+        strip = img_array[y: y + _TILE_HEIGHT]
+        if strip.shape[0] > 30:
+            strips.append(strip)
+        y += step
+    return strips
+
+
+def _ocr_strip(reader, strip: np.ndarray) -> list[tuple[str, float]]:
+    """Run EasyOCR on one strip, with CPU fallback on OOM."""
+    try:
+        results = reader.readtext(strip, adjust_contrast=0.5, canvas_size=_CANVAS_SIZE)
+    except RuntimeError as exc:
+        if "out of memory" not in str(exc).lower():
+            raise
+        logger.warning("GPU OOM on strip — retrying on CPU")
+        try:
+            import torch
+            torch.cuda.empty_cache()
+        except Exception:
+            pass
+        results = reader.readtext(strip, adjust_contrast=0.5, canvas_size=_CANVAS_SIZE,
+                                   gpu=False)
+
+    kept = [(r[1], float(r[2])) for r in results if float(r[2]) >= _MIN_CONF]
+    return kept or [(r[1], float(r[2])) for r in results]
+
+
 def ocr_image(img_bytes: bytes) -> tuple[str, float]:
-    """Run OCR on raw image bytes.
+    """Run OCR on raw image bytes, tiling tall pages to stay within VRAM limits.
 
     Returns:
         (text, avg_confidence) — confidence is 0.0 if nothing detected.
@@ -53,24 +95,22 @@ def ocr_image(img_bytes: bytes) -> tuple[str, float]:
     img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
     img_array = np.array(img)
 
-    # canvas_size caps the CRAFT detection pass to avoid GPU OOM on large pages.
-    # Recognition still runs at full input resolution.
-    results = reader.readtext(img_array, adjust_contrast=0.5, canvas_size=2560)
+    all_texts: list[str] = []
+    all_scores: list[float] = []
 
-    if not results:
+    for strip in _tile(img_array):
+        kept = _ocr_strip(reader, strip)
+        all_texts.extend(t for t, _ in kept)
+        all_scores.extend(s for _, s in kept)
+        try:
+            import torch
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        except Exception:
+            pass
+
+    if not all_texts:
         return "", 0.0
 
-    # Filter out noise detections (table borders, artifacts, single characters)
-    # that drag the confidence average down — only keep results above threshold
-    MIN_CONF = 0.4
-    kept = [(r[1], float(r[2])) for r in results if float(r[2]) >= MIN_CONF]
-
-    if not kept:
-        # Nothing above threshold: fall back to all results so we at least get text
-        kept = [(r[1], float(r[2])) for r in results]
-
-    texts = [t for t, _ in kept]
-    scores = [s for _, s in kept]
-
-    avg_confidence = sum(scores) / len(scores) if scores else 0.0
-    return "\n".join(texts), avg_confidence
+    avg_confidence = sum(all_scores) / len(all_scores) if all_scores else 0.0
+    return "\n".join(all_texts), avg_confidence
