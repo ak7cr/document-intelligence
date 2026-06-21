@@ -15,50 +15,23 @@ logger = logging.getLogger(__name__)
 MAX_CHARS = 14_000
 
 _PROMPT = """\
-You are a document analyst specializing in procurement and tender documents.
-The document may be in Hindi, English, or mixed script. The text may contain OCR errors — correct obvious ones using context.
+You are a document analyst. The document below may be in Hindi, English, or mixed script.
+OCR errors may be present — use context to correct them.
 
-Return ONLY a valid JSON object. No markdown, no prose, no explanation.
+Output ONLY a single valid JSON object. No markdown, no explanation, no text before or after the JSON.
 
-Language rules for each field:
-- headline, summary_text, key_points: write in ENGLISH. Keep proper nouns (organization names, person names, place names) exactly as they appear in the document — do not translate names.
-- entity values: keep EXACTLY as they appear in the source document. If the document is in Hindi, entity values should be in Hindi.
-- doc_type, risk_level, timeline_urgency, risk_factors, opportunities, recommended_actions: write in ENGLISH.
+Language rules:
+- "headline", "summary_text", "key_points", "risk_factors", "opportunities", "recommended_actions", "timeline_urgency": write in ENGLISH. Keep proper nouns (names, places, org names) exactly as they appear in the source — do NOT translate names.
+- entity "value" fields: copy EXACTLY as they appear in the document (Hindi is fine).
+- "doc_type", "risk_level": English only.
 
-{{
-  "doc_type": "<Tender Notice | RFP | Purchase Order | Contract | Invoice | Other>",
-  "entities": [
-    {{"type": "<date|deadline|party|amount|reference>", "label": "<short label>", "value": "<extracted value>"}}
-  ],
-  "headline": "<one sentence, max 120 chars: what this document is and its main purpose>",
-  "summary_text": "<2-3 sentence paragraph: what the doc is, who it involves, what it is for>",
-  "key_points": ["<concise fact 1, under 100 chars>", "<fact 2>", "<fact 3>"],
-  "risk_level": "<low|medium|high>",
-  "confidence": 0.0,
-  "timeline_urgency": "<brief deadline urgency description, or No deadline found>",
-  "risk_factors": ["<specific risk 1>", "<specific risk 2>"],
-  "opportunities": ["<opportunity 1>", "<opportunity 2>"],
-  "recommended_actions": ["<concrete action 1>", "<concrete action 2>"]
-}}
+JSON format:
+{{"doc_type":"Tender Notice","entities":[{{"type":"party","label":"Issuing Authority","value":"<org name as in doc>"}},{{"type":"deadline","label":"Submission Deadline","value":"<date as in doc>"}},{{"type":"amount","label":"Contract Value","value":"<amount as in doc>"}}],"headline":"<one English sentence describing the document>","summary_text":"<2-3 English sentences: what, who, purpose>","key_points":["<fact 1>","<fact 2>","<fact 3>"],"risk_level":"low","confidence":0.8,"timeline_urgency":"<English description>","risk_factors":["<risk 1>"],"opportunities":["<opportunity 1>"],"recommended_actions":["<action 1>"]}}
 
-Entity types:
-- date: issue date, validity date, opening date, any named dates
-- deadline: submission deadline, bid closing date, response due date
-- party: organizations, companies, agencies, signatories, bidders
-- amount: monetary values, bid amounts, contract value, quantities with units
-- reference: document IDs, tender IDs, procurement IDs, order numbers
+Entity types: date, deadline, party, amount, reference
+Risk levels: low, medium, high
 
-Risk guidelines:
-- low: clear terms, reasonable deadlines, known parties, standard amounts
-- medium: ambiguous terms, tight timeline, unfamiliar party, moderate value
-- high: deadline under 7 days, very large amounts, unusual clauses, critical info missing
-- confidence: 0.0-1.0, how certain you are given available information
-- key_points: 3-6 bullets, each under 100 characters
-- risk_factors: 2-5 specific concerns
-- opportunities: 2-4 positive indicators or advantages
-- recommended_actions: 2-4 concrete next steps
-
-Document excerpt:
+Document:
 ---
 {text}
 ---
@@ -104,6 +77,20 @@ def _call_ollama(prompt: str) -> str:
     return resp.json()["response"].strip()
 
 
+def _repair(text: str) -> str:
+    """Fix common LLM JSON mistakes before parsing."""
+    # Python-style literals
+    text = re.sub(r'\bNone\b', 'null', text)
+    text = re.sub(r'\bTrue\b', 'true', text)
+    text = re.sub(r'\bFalse\b', 'false', text)
+    # Trailing commas before ] or }
+    text = re.sub(r',\s*([\]\}])', r'\1', text)
+    # Smart quotes
+    text = text.replace('“', '"').replace('”', '"')
+    text = text.replace('‘', "'").replace('’', "'")
+    return text
+
+
 def _parse(raw: str) -> dict:
     text = raw.strip()
 
@@ -112,21 +99,26 @@ def _parse(raw: str) -> dict:
     if fence:
         text = fence.group(1).strip()
 
-    # Try direct parse
-    try:
-        data = json.loads(text)
-    except (json.JSONDecodeError, TypeError):
-        # Fallback: extract the first {...} block from the raw output
-        match = re.search(r"\{[\s\S]*\}", text)
-        if match:
-            try:
-                data = json.loads(match.group(0))
-            except (json.JSONDecodeError, TypeError):
-                logger.warning("analyze_document: could not parse LLM JSON output")
-                return _empty()
-        else:
-            logger.warning("analyze_document: could not parse LLM JSON output")
-            return _empty()
+    # Try candidates: full text, repaired text, first {...} block, repaired block
+    candidates = [text, _repair(text)]
+    block = re.search(r"\{[\s\S]*\}", text)
+    if block:
+        candidates += [block.group(0), _repair(block.group(0))]
+
+    data = None
+    for candidate in candidates:
+        try:
+            data = json.loads(candidate)
+            break
+        except (json.JSONDecodeError, TypeError):
+            continue
+
+    if data is None:
+        logger.warning(
+            "analyze_document: could not parse LLM JSON output. Raw (first 400 chars): %s",
+            raw[:400].replace('\n', ' '),
+        )
+        return _empty()
 
     risk_level = str(data.get("risk_level", "unknown")).lower().strip()
     if risk_level not in ("low", "medium", "high"):
