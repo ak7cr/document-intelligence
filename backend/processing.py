@@ -1,8 +1,8 @@
 """Thin wrapper — enqueues document processing to the Celery task queue."""
 
-from tasks import process_document
+from tasks import process_document, run_analysis  # noqa: F401 — registers both tasks
 
 
 def trigger_processing(doc_id: str) -> None:
-    """Send a process_document task to the Celery worker via Redis."""
+    """Enqueue phase 1 (parse + index). Phase 2 (LLM analysis) is chained automatically."""
     process_document.delay(doc_id)
