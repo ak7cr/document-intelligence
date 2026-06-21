@@ -20,7 +20,9 @@ def _get_model():
     global _model
     if _model is None:
         from sentence_transformers import SentenceTransformer
-        _model = SentenceTransformer(MODEL_NAME)
+        # Force CPU — bge-small-en-v1.5 is 33M params and fast enough on CPU.
+        # Keeping it off GPU leaves VRAM free for EasyOCR's CRAFT model.
+        _model = SentenceTransformer(MODEL_NAME, device="cpu")
     return _model
 
 

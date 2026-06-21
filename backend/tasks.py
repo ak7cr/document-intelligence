@@ -64,6 +64,12 @@ def _process(task, doc_id: str) -> None:
         # ── Extract text / OCR ────────────────────────────────────────────────
         result = dispatch(doc.filetype, data)
 
+        # Re-check document still exists — user may have deleted it during slow OCR
+        db.session.expire(doc)
+        if not Document.query.get(doc_id):
+            logger.warning("Document %s was deleted during OCR — aborting task", doc_id)
+            return
+
         # ── Persist text ──────────────────────────────────────────────────────
         existing = DocumentText.query.filter_by(document_id=doc_id).first()
         if existing:
