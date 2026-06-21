@@ -16,8 +16,9 @@ MAX_CHARS = 14_000
 
 _PROMPT = """\
 You are a document analyst specializing in procurement and tender documents.
+The document may be in any language (Hindi, English, or mixed). Always respond in ENGLISH only.
 Analyze the document excerpt below and return ALL of the following in ONE JSON object.
-Return ONLY valid JSON — no markdown fences, no prose, no explanation.
+Return ONLY valid JSON — no markdown fences, no prose, no explanation. All field values must be in English.
 
 {{
   "doc_type": "<Tender Notice | RFP | Purchase Order | Contract | Invoice | Other>",

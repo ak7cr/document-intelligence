@@ -10,7 +10,8 @@ logger = logging.getLogger(__name__)
 MAX_TEXT_CHARS = 12_000
 
 _PROMPT = """\
-You are a procurement compliance analyst. Assess whether the company below is eligible to bid for the given tender.
+You are a procurement compliance analyst. The tender document may be in Hindi, English, or mixed — always respond in English only.
+Assess whether the company below is eligible to bid for the given tender.
 
 Company Profile:
 - Name: {company_name}

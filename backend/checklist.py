@@ -13,6 +13,7 @@ _VALID_STATUSES = {"required", "optional"}
 def build_checklist(tender_text: str) -> dict:
     """Extract bid submission checklist items from tender text."""
     prompt = f"""Analyze this tender document and extract a comprehensive bid submission checklist.
+The document may be in Hindi, English, or mixed. Always respond in English only.
 
 For each item a bidder must prepare or submit, identify:
 - name: Short descriptive name of the item

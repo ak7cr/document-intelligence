@@ -13,8 +13,12 @@ def _is_scanned(text: str) -> bool:
 
 
 def _render_page(page: fitz.Page) -> bytes:
-    """Render a PDF page to a PNG at 2× zoom (≈144 DPI) for OCR."""
-    mat = fitz.Matrix(2.0, 2.0)
+    """Render a PDF page to a PNG at 3× zoom (≈216 DPI) for OCR.
+
+    3× gives enough resolution for Devanagari/Hindi fine strokes and the
+    horizontal shirorekha line that connects letters.
+    """
+    mat = fitz.Matrix(3.0, 3.0)
     pix = page.get_pixmap(matrix=mat, alpha=False)
     return pix.tobytes("png")
 
