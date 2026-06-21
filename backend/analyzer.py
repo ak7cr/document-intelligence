@@ -17,6 +17,7 @@ MAX_CHARS = 14_000
 _PROMPT = """\
 You are a document analyst specializing in procurement and tender documents.
 The document may be in any language (Hindi, English, or mixed). Always respond in ENGLISH only.
+The text below may contain OCR errors (e.g. "Shnip" instead of "Ship", missing slashes in dates like "11022019" instead of "11/02/2019"). Correct obvious errors using context when extracting information.
 Analyze the document excerpt below and return ALL of the following in ONE JSON object.
 Return ONLY valid JSON — no markdown fences, no prose, no explanation. All field values must be in English.
 

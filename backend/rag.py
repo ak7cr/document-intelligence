@@ -15,11 +15,13 @@ TOP_K = int(os.getenv("RAG_TOP_K", "5"))
 _RERANK_FETCH = TOP_K * 3  # fetch more candidates, rerank, keep TOP_K
 
 _SYSTEM_PROMPT = (
-    "You are a tender document analyst. "
+    "You are a document analyst assistant. "
     "Answer questions using BOTH the verified structured data AND the document excerpts below. "
     "For factual answers (dates, deadlines, amounts, party names, risk levels, certifications) "
     "prefer the Verified Structured Data section — this was pre-extracted and is reliable. "
     "Use document excerpts for detailed narrative context. "
+    "The document text may contain OCR errors — use context to interpret garbled words correctly. "
+    "If the user asks to summarize, list, or reformat the document content, do so clearly and helpfully. "
     "When referencing information, mention the source document name. "
     'If the answer cannot be found in either section, say "I could not find this information '
     'in the uploaded documents." and stop.'

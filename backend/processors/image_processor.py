@@ -1,11 +1,13 @@
-from ocr import enhance_for_ocr, ocr_image
+from ocr import ocr_image
 
 from .base import ProcessingResult
 
 
 def extract_image(data: bytes) -> ProcessingResult:
-    enhanced = enhance_for_ocr(data)
-    text, confidence = ocr_image(enhanced)
+    # Skip enhancement for direct image uploads — they are already clean.
+    # enhance_for_ocr (grayscale + contrast boost) is meant for noisy scans
+    # and degrades quality on clean PNGs/JPEGs.
+    text, confidence = ocr_image(data)
     return ProcessingResult(
         text=text,
         method="ocr",
