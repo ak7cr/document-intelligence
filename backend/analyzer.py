@@ -16,10 +16,14 @@ MAX_CHARS = 14_000
 
 _PROMPT = """\
 You are a document analyst specializing in procurement and tender documents.
-The document may be in any language (Hindi, English, or mixed). Always respond in ENGLISH only.
-The text below may contain OCR errors (e.g. "Shnip" instead of "Ship", missing slashes in dates like "11022019" instead of "11/02/2019"). Correct obvious errors using context when extracting information.
-Analyze the document excerpt below and return ALL of the following in ONE JSON object.
-Return ONLY valid JSON — no markdown fences, no prose, no explanation. All field values must be in English.
+The document may be in Hindi, English, or mixed script. The text may contain OCR errors — correct obvious ones using context.
+
+Return ONLY a valid JSON object. No markdown, no prose, no explanation.
+
+Language rules for each field:
+- headline, summary_text, key_points: write in ENGLISH. Keep proper nouns (organization names, person names, place names) exactly as they appear in the document — do not translate names.
+- entity values: keep EXACTLY as they appear in the source document. If the document is in Hindi, entity values should be in Hindi.
+- doc_type, risk_level, timeline_urgency, risk_factors, opportunities, recommended_actions: write in ENGLISH.
 
 {{
   "doc_type": "<Tender Notice | RFP | Purchase Order | Contract | Invoice | Other>",

@@ -10,7 +10,9 @@ logger = logging.getLogger(__name__)
 MAX_TEXT_CHARS = 12_000
 
 _PROMPT = """\
-You are a procurement compliance analyst. The tender document may be in Hindi, English, or mixed — always respond in English only.
+You are a procurement compliance analyst.
+The tender document may be in Hindi, English, or mixed script — always respond in ENGLISH.
+Keep proper nouns (organization names, place names) as they appear in the source document.
 Assess whether the company below is eligible to bid for the given tender.
 
 Company Profile:
