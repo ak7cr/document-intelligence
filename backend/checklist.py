@@ -41,11 +41,18 @@ TENDER DOCUMENT:
         fence = re.search(r"```(?:json)?\s*([\s\S]*?)```", text)
         if fence:
             text = fence.group(1).strip()
-        try:
-            data = json.loads(text)
-        except (json.JSONDecodeError, TypeError):
-            match = re.search(r"\{[\s\S]*\}", text)
-            data = json.loads(match.group(0)) if match else {}
+        data = None
+        for candidate in [text, (re.search(r"\{[\s\S]*\}", text) or type("", (), {"group": lambda *_: None})()).group(0)]:
+            if not candidate:
+                continue
+            try:
+                data = json.loads(candidate)
+                break
+            except (json.JSONDecodeError, TypeError):
+                continue
+        if data is None:
+            logger.warning("build_checklist: LLM did not return valid JSON (model may not support multilingual JSON output)")
+            return {"items": []}
         items = data.get("items", [])
         valid = []
         for item in items:
