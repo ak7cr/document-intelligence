@@ -18,7 +18,7 @@ def _render_page(page: fitz.Page) -> bytes:
     3× gives enough resolution for Devanagari/Hindi fine strokes and the
     horizontal shirorekha line that connects letters.
     """
-    mat = fitz.Matrix(4.0, 4.0)
+    mat = fitz.Matrix(3.0, 3.0)
     pix = page.get_pixmap(matrix=mat, alpha=False)
     return pix.tobytes("png")
 
@@ -42,6 +42,13 @@ def extract_pdf(data: bytes) -> ProcessingResult:
             all_texts.append(ocr_text)
             if conf > 0:
                 ocr_confidences.append(conf)
+            # Free GPU VRAM between pages so allocations don't accumulate
+            try:
+                import torch
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+            except Exception:
+                pass
         else:
             all_texts.append(text)
 

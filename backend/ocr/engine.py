@@ -53,8 +53,9 @@ def ocr_image(img_bytes: bytes) -> tuple[str, float]:
     img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
     img_array = np.array(img)
 
-    # adjust_contrast improves detection on uneven lighting/scanned pages
-    results = reader.readtext(img_array, adjust_contrast=0.5)
+    # canvas_size caps the CRAFT detection pass to avoid GPU OOM on large pages.
+    # Recognition still runs at full input resolution.
+    results = reader.readtext(img_array, adjust_contrast=0.5, canvas_size=2560)
 
     if not results:
         return "", 0.0
