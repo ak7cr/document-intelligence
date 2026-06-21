@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import Markdown from 'react-markdown'
 import { chatSession } from '../api/chat'
 import type { ChatMessage, ChatSource } from '../types'
 
@@ -153,8 +154,8 @@ function MessageBubble({ message }: { message: ChatMessage }) {
         AI
       </div>
       <div className="max-w-[80%] space-y-2">
-        <div className="bg-white border border-gray-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-800 leading-relaxed">
-          {message.content}
+        <div className="bg-white border border-gray-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-800 leading-relaxed markdown-body">
+          <Markdown>{message.content}</Markdown>
         </div>
         {confStyle && (
           <div className="flex items-center gap-1.5 px-1">
