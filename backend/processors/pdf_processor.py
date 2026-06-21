@@ -18,7 +18,7 @@ def _render_page(page: fitz.Page) -> bytes:
     3× gives enough resolution for Devanagari/Hindi fine strokes and the
     horizontal shirorekha line that connects letters.
     """
-    mat = fitz.Matrix(3.0, 3.0)
+    mat = fitz.Matrix(4.0, 4.0)
     pix = page.get_pixmap(matrix=mat, alpha=False)
     return pix.tobytes("png")
 

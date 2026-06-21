@@ -38,7 +38,7 @@ def _get_reader():
 
         logger.info("Initialising EasyOCR (first run downloads models)… GPU=%s", use_gpu)
         _reader = easyocr.Reader(["en", "hi"], gpu=use_gpu)
-        logger.info("EasyOCR ready")
+        logger.info("EasyOCR ready (en+hi, GPU=%s)", use_gpu)
     return _reader
 
 
@@ -53,13 +53,23 @@ def ocr_image(img_bytes: bytes) -> tuple[str, float]:
     img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
     img_array = np.array(img)
 
-    results = reader.readtext(img_array)
+    # adjust_contrast improves detection on uneven lighting/scanned pages
+    results = reader.readtext(img_array, adjust_contrast=0.5)
 
     if not results:
         return "", 0.0
 
-    texts = [r[1] for r in results]
-    scores = [float(r[2]) for r in results]
+    # Filter out noise detections (table borders, artifacts, single characters)
+    # that drag the confidence average down — only keep results above threshold
+    MIN_CONF = 0.4
+    kept = [(r[1], float(r[2])) for r in results if float(r[2]) >= MIN_CONF]
+
+    if not kept:
+        # Nothing above threshold: fall back to all results so we at least get text
+        kept = [(r[1], float(r[2])) for r in results]
+
+    texts = [t for t, _ in kept]
+    scores = [s for _, s in kept]
 
     avg_confidence = sum(scores) / len(scores) if scores else 0.0
     return "\n".join(texts), avg_confidence
