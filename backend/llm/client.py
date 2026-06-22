@@ -33,7 +33,18 @@ def _ollama(prompt: str) -> str:
     try:
         resp = requests.post(
             f"{OLLAMA_HOST}/api/generate",
-            json={"model": OLLAMA_MODEL, "prompt": prompt, "stream": False, "format": "json"},
+            json={
+                "model": OLLAMA_MODEL,
+                "prompt": prompt,
+                "stream": False,
+                "format": {
+                    "type": "object",
+                    "properties": {
+                        "items": {"type": "array", "items": {"type": "object", "properties": {"name": {"type": "string"}, "category": {"type": "string"}, "status": {"type": "string"}, "notes": {"type": "string"}}, "required": ["name", "category", "status", "notes"]}}
+                    },
+                    "required": ["items"],
+                },
+            },
             timeout=120,
         )
         resp.raise_for_status()

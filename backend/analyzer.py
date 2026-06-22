@@ -17,13 +17,10 @@ MAX_CHARS = 14_000
 _PROMPT = """\
 You are a document analyst. The document below may be in Hindi, English, or mixed script.
 OCR errors may be present — use context to correct them.
+Respond in whichever language best captures the content — Hindi, English, or mixed is fine.
+Keep proper nouns (org names, person names, places) exactly as they appear in the source.
 
-Output ONLY a single valid JSON object. No markdown, no explanation, no text before or after the JSON.
-
-Language rules:
-- "headline", "summary_text", "key_points", "risk_factors", "opportunities", "recommended_actions", "timeline_urgency": write in ENGLISH. Keep proper nouns (names, places, org names) exactly as they appear in the source — do NOT translate names.
-- entity "value" fields: copy EXACTLY as they appear in the document (Hindi is fine).
-- "doc_type", "risk_level": English only.
+Fill in this JSON using the document content:
 
 JSON format:
 {{"doc_type":"Tender Notice","entities":[{{"type":"party","label":"Issuing Authority","value":"<org name as in doc>"}},{{"type":"deadline","label":"Submission Deadline","value":"<date as in doc>"}},{{"type":"amount","label":"Contract Value","value":"<amount as in doc>"}}],"headline":"<one English sentence describing the document>","summary_text":"<2-3 English sentences: what, who, purpose>","key_points":["<fact 1>","<fact 2>","<fact 3>"],"risk_level":"low","confidence":0.8,"timeline_urgency":"<English description>","risk_factors":["<risk 1>"],"opportunities":["<opportunity 1>"],"recommended_actions":["<action 1>"]}}
@@ -66,6 +63,27 @@ def _call_gemini(prompt: str) -> str:
     return response.text.strip()
 
 
+_OLLAMA_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "doc_type":            {"type": "string"},
+        "entities":            {"type": "array", "items": {"type": "object", "properties": {"type": {"type": "string"}, "label": {"type": "string"}, "value": {"type": "string"}}, "required": ["type", "label", "value"]}},
+        "headline":            {"type": "string"},
+        "summary_text":        {"type": "string"},
+        "key_points":          {"type": "array", "items": {"type": "string"}},
+        "risk_level":          {"type": "string", "enum": ["low", "medium", "high", "unknown"]},
+        "confidence":          {"type": "number"},
+        "timeline_urgency":    {"type": "string"},
+        "risk_factors":        {"type": "array", "items": {"type": "string"}},
+        "opportunities":       {"type": "array", "items": {"type": "string"}},
+        "recommended_actions": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["doc_type", "entities", "headline", "summary_text", "key_points",
+                 "risk_level", "confidence", "timeline_urgency", "risk_factors",
+                 "opportunities", "recommended_actions"],
+}
+
+
 def _call_ollama(prompt: str) -> str:
     import requests
     resp = requests.post(
@@ -74,7 +92,7 @@ def _call_ollama(prompt: str) -> str:
             "model": os.getenv("OLLAMA_MODEL", "llama3.2"),
             "prompt": prompt,
             "stream": False,
-            "format": "json",  # forces valid JSON output regardless of model behaviour
+            "format": _OLLAMA_SCHEMA,  # constrained decoding — model CANNOT deviate from schema
         },
         timeout=180,
     )

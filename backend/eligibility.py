@@ -96,6 +96,19 @@ def _call_gemini(prompt: str) -> str:
     return response.text.strip()
 
 
+_ELIG_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "score":               {"type": "integer"},
+        "met":                 {"type": "array", "items": {"type": "string"}},
+        "missing":             {"type": "array", "items": {"type": "string"}},
+        "documents_required":  {"type": "array", "items": {"type": "object", "properties": {"name": {"type": "string"}, "status": {"type": "string", "enum": ["available", "required"]}}, "required": ["name", "status"]}},
+        "recommendation":      {"type": "string"},
+    },
+    "required": ["score", "met", "missing", "documents_required", "recommendation"],
+}
+
+
 def _call_ollama(prompt: str) -> str:
     import requests
     resp = requests.post(
@@ -104,7 +117,7 @@ def _call_ollama(prompt: str) -> str:
             "model": os.getenv("OLLAMA_MODEL", "llama3.2"),
             "prompt": prompt,
             "stream": False,
-            "format": "json",
+            "format": _ELIG_SCHEMA,
         },
         timeout=180,
     )
