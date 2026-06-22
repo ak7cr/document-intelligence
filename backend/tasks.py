@@ -8,6 +8,7 @@ Two-phase pipeline:
 """
 
 import logging
+import os
 
 from analyzer import analyze_document
 from celery_app import celery
@@ -83,10 +84,11 @@ def _process(task, doc_id: str) -> None:
             response.close()
             response.release_conn()
 
-        # ── Free GPU before OCR ───────────────────────────────────────────────
-        _unload_ollama()
-        from ocr.engine import reset_reader
-        reset_reader()
+        # ── Free GPU before OCR (only needed when OCR uses local GPU) ─────────
+        if os.getenv("OCR_ENGINE", "easyocr").lower() == "easyocr":
+            _unload_ollama()
+            from ocr.engine import reset_reader
+            reset_reader()
 
         # ── Extract text / OCR ────────────────────────────────────────────────
         result = dispatch(doc.filetype, data)

@@ -116,10 +116,20 @@ def _ocr_strip(reader, strip: np.ndarray) -> list[tuple[str, float]]:
 def ocr_image(img_bytes: bytes) -> tuple[str, float]:
     """Run OCR on raw image bytes using the configured backend.
 
+    OCR_ENGINE=gemini    — Gemini Vision (best quality, needs GEMINI_API_KEY)
+    OCR_ENGINE=tesseract — Tesseract (CPU, needs apt packages)
+    OCR_ENGINE=easyocr   — EasyOCR (default, GPU/CPU)
+
     Returns:
         (text, avg_confidence) — confidence is 0.0 if nothing detected.
     """
-    if os.getenv("OCR_ENGINE", "easyocr").lower() == "tesseract":
+    engine = os.getenv("OCR_ENGINE", "easyocr").lower()
+
+    if engine == "gemini":
+        from .gemini_engine import ocr_image_gemini
+        return ocr_image_gemini(img_bytes)
+
+    if engine == "tesseract":
         from .tesseract_engine import ocr_image_tesseract
         return ocr_image_tesseract(img_bytes)
 

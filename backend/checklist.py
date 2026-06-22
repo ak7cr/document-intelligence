@@ -1,10 +1,37 @@
 import json
 import logging
+import os
 import re
 
-from llm.client import generate
-
 logger = logging.getLogger(__name__)
+
+_CL_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "items": {"type": "array", "items": {"type": "object", "properties": {
+            "name": {"type": "string"}, "category": {"type": "string"},
+            "status": {"type": "string"}, "notes": {"type": "string"},
+        }, "required": ["name", "category", "status", "notes"]}},
+    },
+    "required": ["items"],
+}
+
+
+def _call_llm(prompt: str) -> str:
+    provider = os.getenv("LLM_PROVIDER", "ollama")
+    if provider == "gemini":
+        from llm.client import generate
+        return generate(prompt)
+    import requests
+    resp = requests.post(
+        f"{os.getenv('OLLAMA_HOST', 'http://localhost:11434')}/api/generate",
+        json={"model": os.getenv("OLLAMA_MODEL", "llama3.2"), "prompt": prompt,
+              "stream": False, "format": _CL_SCHEMA},
+        timeout=180,
+    )
+    resp.raise_for_status()
+    return resp.json()["response"].strip()
+
 
 _VALID_CATS = {"Technical", "Financial", "Legal", "Administrative"}
 _VALID_STATUSES = {"required", "optional"}
@@ -37,7 +64,7 @@ TENDER DOCUMENT:
 """
 
     try:
-        raw = generate(prompt)
+        raw = _call_llm(prompt)
         text = raw.strip()
         fence = re.search(r"```(?:json)?\s*([\s\S]*?)```", text)
         if fence:
