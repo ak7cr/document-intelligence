@@ -123,7 +123,8 @@ def ocr_image(img_bytes: bytes) -> tuple[str, float]:
     Returns:
         (text, avg_confidence) — confidence is 0.0 if nothing detected.
     """
-    engine = os.getenv("OCR_ENGINE", "easyocr").lower()
+    from config import get_ocr_engine
+    engine = get_ocr_engine()
 
     if engine == "gemini":
         from .gemini_engine import ocr_image_gemini

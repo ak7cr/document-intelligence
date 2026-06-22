@@ -13,6 +13,7 @@ import TimelinePanel from './components/TimelinePanel'
 import EntityGraphPanel from './components/EntityGraphPanel'
 import OcrReviewBanner from './components/OcrReviewBanner'
 import { fetchSessions } from './api/sessions'
+import { fetchOcrEngine, setOcrEngine, type OcrEngine } from './api/config'
 import { exportJson, exportCsv, exportXlsx } from './api/export'
 
 type Tab = 'documents' | 'chat' | 'compare' | 'analytics' | 'predictions' | 'eligibility' | 'timeline' | 'graph'
@@ -22,6 +23,16 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('documents')
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
+  const [ocrEngine, setOcrEngineState] = useState<OcrEngine>('easyocr')
+
+  useEffect(() => {
+    fetchOcrEngine().then(setOcrEngineState).catch(() => {})
+  }, [])
+
+  async function handleOcrChange(engine: OcrEngine) {
+    setOcrEngineState(engine)
+    await setOcrEngine(engine).catch(() => {})
+  }
 
   const { data: sessions = [] } = useQuery({
     queryKey: ['sessions'],
@@ -83,6 +94,19 @@ export default function App() {
                 {/* Right side: search (Documents tab) + Export button */}
                 <div className="flex items-start gap-3 mt-1 shrink-0">
                   {tab === 'documents' && (
+                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-0.5 bg-gray-100 rounded-lg p-0.5">
+                      {(['gemini', 'easyocr', 'tesseract'] as OcrEngine[]).map((e) => (
+                        <button
+                          key={e}
+                          onClick={() => handleOcrChange(e)}
+                          className={'px-2 py-1 text-[10px] font-medium rounded-md transition ' +
+                            (ocrEngine === e ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700')}
+                        >
+                          {e === 'easyocr' ? 'EasyOCR' : e.charAt(0).toUpperCase() + e.slice(1)}
+                        </button>
+                      ))}
+                    </div>
                     <div className="relative w-56">
                       <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm select-none">
                         &#128269;
@@ -101,6 +125,7 @@ export default function App() {
                           x
                         </button>
                       )}
+                    </div>
                     </div>
                   )}
                   <ExportMenu sessionId={activeSession.id} sessionName={activeSession.name} />

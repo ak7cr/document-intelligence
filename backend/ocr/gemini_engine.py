@@ -54,16 +54,61 @@ def ocr_image_gemini(img_bytes: bytes) -> tuple[str, float]:
         "Output only the extracted text — no explanation, no commentary."
     )
 
+    import time
+    last_exc: Exception = RuntimeError("no attempt made")
+    for attempt in range(4):
+        try:
+            response = client.models.generate_content(
+                model=model,
+                contents=[
+                    types.Part.from_bytes(data=png_bytes, mime_type="image/png"),
+                    prompt,
+                ],
+            )
+            text = (response.text or "").strip()
+            return text, 0.95 if text else 0.0
+        except Exception as exc:
+            last_exc = exc
+            msg = str(exc)
+            if any(x in msg for x in ("503", "UNAVAILABLE", "429", "RESOURCE_EXHAUSTED")):
+                wait = 2 ** attempt  # 1 → 2 → 4 → 8 s
+                logger.warning(
+                    "Gemini OCR transient error (attempt %d/4): %s — retrying in %ds",
+                    attempt + 1, msg[:80], wait,
+                )
+                time.sleep(wait)
+            else:
+                break
+
+    logger.error("Gemini OCR failed after retries (%s) — trying EasyOCR then Tesseract", last_exc)
+
+    # Fallback 1: EasyOCR
     try:
-        response = client.models.generate_content(
-            model=model,
-            contents=[
-                types.Part.from_bytes(data=png_bytes, mime_type="image/png"),
-                prompt,
-            ],
-        )
-        text = (response.text or "").strip()
-        return text, 0.95 if text else 0.0
+        import io as _io
+        import numpy as np
+        from PIL import Image as _Image
+        from .engine import _get_reader, _ocr_strip, _tile
+        reader = _get_reader()
+        img_array = np.array(_Image.open(_io.BytesIO(img_bytes)).convert("RGB"))
+        all_texts, all_scores = [], []
+        for strip in _tile(img_array):
+            kept = _ocr_strip(reader, strip)
+            all_texts.extend(t for t, _ in kept)
+            all_scores.extend(s for _, s in kept)
+        text = "\n".join(all_texts)
+        if text.strip():
+            conf = sum(all_scores) / len(all_scores) if all_scores else 0.0
+            logger.info("EasyOCR fallback succeeded")
+            return text, conf
     except Exception as exc:
-        logger.error("Gemini OCR failed: %s", exc)
+        logger.warning("EasyOCR fallback failed: %s — trying Tesseract", exc)
+
+    # Fallback 2: Tesseract
+    try:
+        from .tesseract_engine import ocr_image_tesseract
+        text, conf = ocr_image_tesseract(img_bytes)
+        logger.info("Tesseract fallback succeeded")
+        return text, conf
+    except Exception as exc:
+        logger.error("Tesseract fallback also failed: %s", exc)
         return "", 0.0
