@@ -4,57 +4,62 @@ A full-stack document intelligence platform for tender and procurement analysis.
 
 ---
 
-## Quick Start (Windows / Linux / Mac — Docker)
-
-The easiest way to run the app is with Docker. No Python or Node.js setup needed.
+## Getting Started
 
 ### Prerequisites
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed and running
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) — for PostgreSQL, Redis, MinIO, Qdrant
+- Python 3.10+
+- Node.js 18+
 - A Gemini API key — get one free at [aistudio.google.com](https://aistudio.google.com)
 
-### Steps
+---
 
-**1. Copy the environment file:**
+### Mac / Linux
+
+**Step 1 — One-time setup** (run once):
 ```bash
-# Linux / Mac
-cp .env.example .env
+./setup.sh
+```
+This starts the infrastructure, creates the Python venv, installs all dependencies, and copies the env file.
 
-# Windows (Command Prompt)
-copy .env.example .env
+**Step 2 — Add your API key:**
+```
+Open backend/.env and set GEMINI_API_KEY=your-key-here
 ```
 
-**2. Open `.env` and set your Gemini API key:**
-```env
-GEMINI_API_KEY=your-key-here
+**Step 3 — Open 3 terminals:**
+
+| Terminal | Command |
+|---|---|
+| 1 — Flask API | `./start-api.sh` |
+| 2 — Celery worker | `./start-worker.sh` |
+| 3 — Frontend | `./start-frontend.sh` |
+
+Open **http://localhost:5173** in your browser.
+
+---
+
+### Windows
+
+**Step 1 — One-time setup** (double-click or run in Command Prompt):
+```
+setup.bat
 ```
 
-**3. Start the app:**
-```bash
-# Linux / Mac
-docker compose up --build -d
-
-# Windows — double-click start.bat  OR run in Command Prompt:
-docker compose up --build -d
+**Step 2 — Add your API key:**
+```
+Open backend\.env and set GEMINI_API_KEY=your-key-here
 ```
 
-**4. Open your browser:**
-```
-http://localhost
-```
+**Step 3 — Open 3 Command Prompt windows:**
 
-> First startup downloads Docker images and builds the app (~5–10 minutes). Subsequent starts take ~20 seconds.
+| Window | Command |
+|---|---|
+| 1 — Flask API | `start-api.bat` |
+| 2 — Celery worker | `start-worker.bat` |
+| 3 — Frontend | `start-frontend.bat` |
 
-**To stop:**
-```bash
-docker compose down
-
-# Windows — double-click stop.bat
-```
-
-**To view logs:**
-```bash
-docker compose logs -f
-```
+Open **http://localhost:5173** in your browser.
 
 ---
 
@@ -136,95 +141,6 @@ Infrastructure (Docker):
 
 ---
 
-## Development Setup (without Docker)
-
-Use this if you want to run the code directly and make changes.
-
-### Prerequisites
-- Python 3.10+
-- Node.js 18+
-- Docker (for PostgreSQL, MinIO, Redis, Qdrant only)
-
-### 1. Start infrastructure
-
-```bash
-docker compose up postgres redis minio qdrant -d
-```
-
-### 2. Backend
-
-```bash
-cd backend
-python -m venv venv
-source venv/bin/activate        # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-```
-
-For Hindi OCR via Tesseract (optional):
-```bash
-# Linux
-apt-get install tesseract-ocr tesseract-ocr-hin tesseract-ocr-eng
-```
-
-Copy and configure environment:
-```bash
-cp rename.env .env
-```
-
-Edit `.env`:
-```env
-DATABASE_URL=postgresql://admin:adminpassword@localhost:5432/tender_rag
-REDIS_URL=redis://localhost:6379/0
-MINIO_ENDPOINT=localhost:9000
-MINIO_ACCESS_KEY=minioadmin
-MINIO_SECRET_KEY=minioadmin
-MINIO_BUCKET=tender-documents
-MINIO_SECURE=false
-QDRANT_HOST=localhost
-QDRANT_PORT=6333
-
-# LLM — choose one:
-LLM_PROVIDER=gemini
-GEMINI_API_KEY=your-key-here
-GEMINI_MODEL=gemini-2.0-flash
-
-# LLM_PROVIDER=ollama
-# OLLAMA_HOST=http://localhost:11434
-# OLLAMA_MODEL=qwen2:7b
-
-# OCR engine — gemini (best), easyocr (local GPU), tesseract (CPU)
-OCR_ENGINE=gemini
-
-SECRET_KEY=change-me-in-production
-```
-
-### 3. Start Flask API
-
-```bash
-flask --app app run --port 5001 --debug
-```
-
-Schema is created automatically on first start.
-
-### 4. Start Celery worker
-
-```bash
-celery -A celery_worker worker --loglevel=info
-```
-
-> `solo` pool is set in code — required because EasyOCR / PyTorch cannot survive `fork()`.
-
-### 5. Frontend
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Open [http://localhost:5173](http://localhost:5173).
-
----
 
 ## LLM Provider Comparison
 
