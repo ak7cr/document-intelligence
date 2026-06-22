@@ -85,6 +85,8 @@ def _process(task, doc_id: str) -> None:
 
         # ── Free GPU before OCR ───────────────────────────────────────────────
         _unload_ollama()
+        from ocr.engine import reset_reader
+        reset_reader()
 
         # ── Extract text / OCR ────────────────────────────────────────────────
         result = dispatch(doc.filetype, data)

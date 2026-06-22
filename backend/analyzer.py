@@ -16,9 +16,17 @@ MAX_CHARS = 14_000
 
 _PROMPT = """\
 You are a document analyst. The document below may be in Hindi, English, or mixed script.
-OCR errors may be present — use context to correct them.
-Respond in whichever language best captures the content — Hindi, English, or mixed is fine.
-Keep proper nouns (org names, person names, places) exactly as they appear in the source.
+OCR errors may be present — correct them using context.
+Respond in any language — Hindi, English, or mixed is fine.
+Keep proper nouns exactly as they appear.
+
+IMPORTANT — entities: extract EVERY fact you can find. Do not stop at 3-5.
+Look for ALL of: organization names, person names, email/phone, reference numbers, tender IDs,
+ALL dates (issue date, download deadline, bid opening, auction date, any other dates),
+ALL monetary amounts (minimum bid, security deposit, processing fee, any other amount),
+website URLs, addresses. Each fact = one entity. Aim for 10+ entities if the document has them.
+
+Entity types to use: date, deadline, party, amount, reference
 
 Fill in this JSON using the document content:
 

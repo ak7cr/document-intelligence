@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 _reader = None
+_reader_cpu_only = False  # set True when moved to CPU due to OOM — reset by reset_reader()
 
 
 def _get_reader():
@@ -65,7 +66,20 @@ def _tile(img_array: np.ndarray) -> list[np.ndarray]:
     return strips
 
 
-_reader_cpu_only = False
+def reset_reader() -> None:
+    """Drop the cached EasyOCR reader so the next call reinitialises on GPU.
+    Call this after freeing VRAM (e.g. after unloading Ollama).
+    """
+    global _reader, _reader_cpu_only
+    _reader = None
+    _reader_cpu_only = False
+    try:
+        import torch
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    except Exception:
+        pass
+    logger.info("EasyOCR reader reset — will reinitialise on next OCR call")
 
 
 def _move_to_cpu(reader) -> None:
