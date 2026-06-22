@@ -11,9 +11,9 @@ pandas
 xlrd
 python-dateutil
 
-# OCR — EasyOCR uses PyTorch (already present via sentence-transformers).
-# GPU is auto-detected at runtime via torch.cuda.is_available().
-easyocr
+# OCR — choose one backend via OCR_ENGINE env var (default: easyocr)
+easyocr               # OCR_ENGINE=easyocr  — GPU, good Hindi accuracy
+pytesseract           # OCR_ENGINE=tesseract — CPU-only, needs: apt-get install tesseract-ocr tesseract-ocr-hin tesseract-ocr-eng
 
 Pillow
 celery[redis]

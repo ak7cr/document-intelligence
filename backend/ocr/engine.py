@@ -1,21 +1,23 @@
-"""EasyOCR wrapper with lazy model initialisation.
+"""OCR dispatcher — selects backend based on OCR_ENGINE env var.
 
-Replaces PaddleOCR 3.x which has irrecoverable version compatibility issues
-between paddleocr/paddlex 3.7.x and the available paddlepaddle wheels.
-
-EasyOCR uses PyTorch (already in the env via sentence-transformers) and has
-no C++ binary compatibility issues. Models download on first use (~100 MB).
+OCR_ENGINE=easyocr   (default) GPU-accelerated, good Hindi accuracy, ~100 MB download
+OCR_ENGINE=tesseract             CPU-only, no download, needs system packages:
+                                 apt-get install tesseract-ocr tesseract-ocr-hin tesseract-ocr-eng
+                                 pip install pytesseract
 """
 
 from __future__ import annotations
 
 import io
 import logging
+import os
 
 import numpy as np
 from PIL import Image
 
 logger = logging.getLogger(__name__)
+
+_ENGINE = os.getenv("OCR_ENGINE", "easyocr").lower()
 
 _reader = None
 
@@ -85,11 +87,15 @@ def _ocr_strip(reader, strip: np.ndarray) -> list[tuple[str, float]]:
 
 
 def ocr_image(img_bytes: bytes) -> tuple[str, float]:
-    """Run OCR on raw image bytes, tiling tall pages to stay within VRAM limits.
+    """Run OCR on raw image bytes using the configured backend.
 
     Returns:
         (text, avg_confidence) — confidence is 0.0 if nothing detected.
     """
+    if _ENGINE == "tesseract":
+        from .tesseract_engine import ocr_image_tesseract
+        return ocr_image_tesseract(img_bytes)
+
     reader = _get_reader()
 
     img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
