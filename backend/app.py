@@ -11,7 +11,12 @@ from vector.store import init_collection as init_qdrant
 
 load_dotenv()
 
-_ALLOWED_ORIGINS = {"http://localhost:5173", "http://127.0.0.1:5173"}
+_ALLOWED_ORIGINS = {
+    "http://localhost:5173",   # Vite dev server
+    "http://127.0.0.1:5173",
+    "http://localhost",        # Docker nginx (port 80)
+    "http://localhost:80",
+}
 
 
 def create_app() -> Flask:

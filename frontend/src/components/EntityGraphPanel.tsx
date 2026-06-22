@@ -1,5 +1,6 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { fetchEntityGraph, runSessionAnalysis } from '../api/sessions'
+import { useQuery } from '@tanstack/react-query'
+import { fetchEntityGraph } from '../api/sessions'
+import type { EntityCluster } from '../types'
 import type { EntityCluster } from '../types'
 
 interface Props {
@@ -19,21 +20,10 @@ const DEFAULT_COLORS = { chip: 'bg-gray-50 text-gray-600 border-gray-200', dot: 
 const ENTITY_ORDER = ['party', 'deadline', 'date', 'amount', 'certification', 'reference']
 
 export default function EntityGraphPanel({ sessionId }: Props) {
-  const qc = useQueryClient()
-
   const { data, isLoading } = useQuery({
     queryKey: ['entity-graph', sessionId],
     queryFn: () => fetchEntityGraph(sessionId),
     staleTime: 2 * 60 * 1000,
-  })
-
-  const runMut = useMutation({
-    mutationFn: () => runSessionAnalysis(sessionId),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['entity-graph', sessionId] })
-      qc.invalidateQueries({ queryKey: ['checklist'] })
-      qc.invalidateQueries({ queryKey: ['eligibility'] })
-    },
   })
 
   const clusters = data?.clusters ?? []
@@ -60,29 +50,12 @@ export default function EntityGraphPanel({ sessionId }: Props) {
 
   return (
     <div className="px-8 py-6 max-w-4xl space-y-6">
-      {/* Header + Run All */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-sm font-semibold text-gray-800">Cross-Document Entity Graph</h2>
-          <p className="text-xs text-gray-400 mt-0.5">
-            Entities that appear in multiple documents within this session
-            {data ? ' · ' + data.total_shared + ' shared' : ''}
-          </p>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {runMut.isSuccess && (
-            <span className="text-xs text-emerald-600">
-              +{runMut.data?.checklist_run ?? 0} checklists, +{runMut.data?.eligibility_run ?? 0} checks
-            </span>
-          )}
-          <button
-            onClick={() => runMut.mutate()}
-            disabled={runMut.isPending}
-            className="text-xs px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50 font-medium"
-          >
-            {runMut.isPending ? 'Running...' : 'Run All Analysis'}
-          </button>
-        </div>
+      <div>
+        <h2 className="text-sm font-semibold text-gray-800">Cross-Document Entity Graph</h2>
+        <p className="text-xs text-gray-400 mt-0.5">
+          Entities that appear in multiple documents within this session
+          {data ? ' · ' + data.total_shared + ' shared' : ''}
+        </p>
       </div>
 
       {clusters.length === 0 ? (
@@ -131,7 +104,7 @@ function ClusterCard({ cluster, color }: { cluster: EntityCluster; color: { chip
             {cluster.documents.map((doc) => (
               <div key={doc.id} className="flex items-center gap-1 bg-gray-50 border border-gray-100 rounded-lg px-2 py-1">
                 <span className="text-[10px] text-gray-400 font-medium">{doc.label}:</span>
-                <span className="text-[11px] text-gray-700 font-medium truncate max-w-[180px]">{doc.filename}</span>
+                <span className="text-[11px] text-gray-700 font-medium truncate max-w-45">{doc.filename}</span>
               </div>
             ))}
           </div>

@@ -31,10 +31,9 @@ Entity types to use: date, deadline, party, amount, reference
 Fill in this JSON using the document content:
 
 JSON format:
-{{"doc_type":"Tender Notice","entities":[{{"type":"party","label":"Issuing Authority","value":"<org name as in doc>"}},{{"type":"deadline","label":"Submission Deadline","value":"<date as in doc>"}},{{"type":"amount","label":"Contract Value","value":"<amount as in doc>"}}],"headline":"<one English sentence describing the document>","summary_text":"<2-3 English sentences: what, who, purpose>","key_points":["<fact 1>","<fact 2>","<fact 3>"],"risk_level":"low","confidence":0.8,"timeline_urgency":"<English description>","risk_factors":["<risk 1>"],"opportunities":["<opportunity 1>"],"recommended_actions":["<action 1>"]}}
+{{"doc_type":"Tender Notice","entities":[{{"type":"party","label":"Issuing Authority","value":"<org name as in doc>"}},{{"type":"deadline","label":"Submission Deadline","value":"<date as in doc>"}},{{"type":"amount","label":"Contract Value","value":"<amount as in doc>"}}],"headline":"<one English sentence describing the document>","summary_text":"<2-3 English sentences: what, who, purpose>","key_points":["<fact 1>","<fact 2>","<fact 3>"]}}
 
 Entity types: date, deadline, party, amount, reference
-Risk levels: low, medium, high
 
 Document:
 ---
@@ -74,21 +73,13 @@ def _call_gemini(prompt: str) -> str:
 _OLLAMA_SCHEMA = {
     "type": "object",
     "properties": {
-        "doc_type":            {"type": "string"},
-        "entities":            {"type": "array", "items": {"type": "object", "properties": {"type": {"type": "string"}, "label": {"type": "string"}, "value": {"type": "string"}}, "required": ["type", "label", "value"]}},
-        "headline":            {"type": "string"},
-        "summary_text":        {"type": "string"},
-        "key_points":          {"type": "array", "items": {"type": "string"}},
-        "risk_level":          {"type": "string", "enum": ["low", "medium", "high", "unknown"]},
-        "confidence":          {"type": "number"},
-        "timeline_urgency":    {"type": "string"},
-        "risk_factors":        {"type": "array", "items": {"type": "string"}},
-        "opportunities":       {"type": "array", "items": {"type": "string"}},
-        "recommended_actions": {"type": "array", "items": {"type": "string"}},
+        "doc_type":    {"type": "string"},
+        "entities":    {"type": "array", "items": {"type": "object", "properties": {"type": {"type": "string"}, "label": {"type": "string"}, "value": {"type": "string"}}, "required": ["type", "label", "value"]}},
+        "headline":    {"type": "string"},
+        "summary_text": {"type": "string"},
+        "key_points":  {"type": "array", "items": {"type": "string"}},
     },
-    "required": ["doc_type", "entities", "headline", "summary_text", "key_points",
-                 "risk_level", "confidence", "timeline_urgency", "risk_factors",
-                 "opportunities", "recommended_actions"],
+    "required": ["doc_type", "entities", "headline", "summary_text", "key_points"],
 }
 
 
@@ -151,12 +142,7 @@ def _parse(raw: str) -> dict:
         )
         return _empty()
 
-    risk_level = str(data.get("risk_level", "unknown")).lower().strip()
-    if risk_level not in ("low", "medium", "high"):
-        risk_level = "unknown"
-
     return {
-        # entities section
         "doc_type": str(data.get("doc_type", "")).strip(),
         "entities": [
             {
@@ -167,17 +153,9 @@ def _parse(raw: str) -> dict:
             for e in data.get("entities", [])
             if e.get("label") and e.get("value")
         ],
-        # summary section
         "headline": str(data.get("headline", "")).strip(),
         "summary_text": str(data.get("summary_text", "")).strip(),
         "key_points": [str(p).strip() for p in data.get("key_points", []) if str(p).strip()],
-        # prediction section
-        "risk_level": risk_level,
-        "confidence": min(max(float(data.get("confidence", 0.5)), 0.0), 1.0),
-        "timeline_urgency": str(data.get("timeline_urgency", "")).strip(),
-        "risk_factors": [str(r).strip() for r in data.get("risk_factors", []) if r],
-        "opportunities": [str(o).strip() for o in data.get("opportunities", []) if o],
-        "recommended_actions": [str(a).strip() for a in data.get("recommended_actions", []) if a],
     }
 
 
@@ -188,10 +166,4 @@ def _empty() -> dict:
         "headline": "",
         "summary_text": "",
         "key_points": [],
-        "risk_level": "unknown",
-        "confidence": 0.0,
-        "timeline_urgency": "",
-        "risk_factors": [],
-        "opportunities": [],
-        "recommended_actions": [],
     }

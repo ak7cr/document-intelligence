@@ -52,38 +52,6 @@ export interface DocumentEntity {
   value: string
 }
 
-export interface DocumentPrediction {
-  document_id: string
-  risk_level: 'low' | 'medium' | 'high' | 'unknown'
-  confidence: number
-  timeline_urgency: string
-  risk_factors: string[]
-  opportunities: string[]
-  recommended_actions: string[]
-  created_at: string
-}
-
-export interface AnalyticsTotals {
-  documents: number
-  ready: number
-  processing: number
-  failed: number
-  pages: number
-  words: number
-  chunks: number
-  entities: number
-}
-
-export interface AnalyticsResult {
-  session_id: string
-  session_name: string
-  totals: AnalyticsTotals
-  doc_types: Record<string, number>
-  entity_types: Record<string, number>
-  top_entities: Record<string, { value: string; count: number }[]>
-  timeline: { date: string; count: number }[]
-}
-
 export interface ComparisonDifference {
   aspect: string
   values: string[]  // one entry per selected document, in order
@@ -109,37 +77,6 @@ export interface ComparisonDoc {
 export interface ComparisonResult {
   docs: ComparisonDoc[]   // N documents in the order they were submitted
   analysis: ComparisonAnalysis
-}
-
-export interface CompanyProfile {
-  id: string
-  session_id: string
-  company_name: string
-  annual_turnover: string
-  years_in_business: number | null
-  certifications: string[]
-  similar_projects: number | null
-  employee_count: string
-  extra_details: string
-  created_at: string
-  updated_at: string
-}
-
-export interface EligibilityDocRequired {
-  name: string
-  status: 'available' | 'required'
-}
-
-export interface EligibilityCheck {
-  id: string
-  document_id: string
-  profile_id: string
-  score: number
-  met: string[]
-  missing: string[]
-  documents_required: EligibilityDocRequired[]
-  recommendation: string
-  created_at: string
 }
 
 export interface OcrReviewItem {

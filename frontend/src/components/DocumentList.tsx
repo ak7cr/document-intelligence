@@ -4,8 +4,9 @@ import {
   fetchDocuments, deleteDocument, getDocumentUrl,
   fetchDocumentEntities, reextractEntities,
   fetchDocumentSummary, resummarizeDocument,
+  fetchChecklist, runChecklist,
 } from '../api/documents'
-import type { Document, DocumentEntity, DocumentSummary } from '../types'
+import type { ChecklistItem, Document, DocumentChecklist, DocumentEntity, DocumentSummary } from '../types'
 
 const TYPE_STYLE: Record<string, { bg: string; label: string }> = {
   pdf:  { bg: 'bg-red-100 text-red-700',      label: 'PDF' },
@@ -41,7 +42,7 @@ const ENTITY_STYLE: Record<string, string> = {
 
 const IN_PROGRESS = new Set(['uploaded', 'processing'])
 
-type InsightsTab = 'summary' | 'entities'
+type InsightsTab = 'summary' | 'entities' | 'checklist'
 
 interface Props {
   sessionId: string
@@ -222,16 +223,16 @@ function DocRow({ doc, onDelete }: { doc: Document; onDelete: () => void }) {
         <div className="border-t border-gray-100">
           {/* Tab bar */}
           <div className="flex gap-0 border-b border-gray-100 px-4">
-            {(['summary', 'entities'] as InsightsTab[]).map((tab) => (
+            {(['summary', 'entities', 'checklist'] as InsightsTab[]).map((t) => (
               <button
-                key={tab}
-                onClick={() => setInsightsTab(tab)}
+                key={t}
+                onClick={() => setInsightsTab(t)}
                 className={'px-3 py-2 text-[11px] font-medium border-b-2 -mb-px transition capitalize ' +
-                  (insightsTab === tab
+                  (insightsTab === t
                     ? 'border-blue-500 text-blue-600'
                     : 'border-transparent text-gray-400 hover:text-gray-600')}
               >
-                {tab === 'summary' ? 'Summary' : 'Entities'}
+                {t === 'summary' ? 'Summary' : t === 'entities' ? 'Entities' : 'Checklist'}
               </button>
             ))}
           </div>
@@ -246,7 +247,7 @@ function DocRow({ doc, onDelete }: { doc: Document; onDelete: () => void }) {
                 generating={resummarizeMut.isPending}
                 generateError={resummarizeMut.isError}
               />
-            ) : (
+            ) : insightsTab === 'entities' ? (
               <EntitiesPane
                 entities={entities}
                 loading={entitiesLoading}
@@ -254,6 +255,8 @@ function DocRow({ doc, onDelete }: { doc: Document; onDelete: () => void }) {
                 extracting={reextractMut.isPending}
                 extractError={reextractMut.isError}
               />
+            ) : (
+              <ChecklistPane docId={doc.id} />
             )}
           </div>
         </div>
@@ -396,6 +399,92 @@ function EntitiesPane({
           </div>
         </div>
       ))}
+    </div>
+  )
+}
+
+const CAT_COLORS: Record<string, string> = {
+  Technical: 'bg-purple-50 text-purple-700 border-purple-200',
+  Financial: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  Legal: 'bg-red-50 text-red-700 border-red-200',
+  Administrative: 'bg-blue-50 text-blue-700 border-blue-200',
+}
+const CATEGORIES = ['Technical', 'Financial', 'Legal', 'Administrative'] as const
+
+function ChecklistPane({ docId }: { docId: string }) {
+  const qc = useQueryClient()
+
+  const { data: cl, isLoading, isError } = useQuery<DocumentChecklist>({
+    queryKey: ['checklist', docId],
+    queryFn: () => fetchChecklist(docId),
+    retry: false,
+    staleTime: 10 * 60 * 1000,
+  })
+
+  const genMut = useMutation({
+    mutationFn: () => runChecklist(docId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['checklist', docId] }),
+  })
+
+  if (isLoading) return <p className="text-[11px] text-gray-400">Loading...</p>
+
+  if (isError || !cl) {
+    return (
+      <div className="flex items-center gap-3">
+        <p className="text-[11px] text-gray-400 flex-1">No checklist yet</p>
+        <button
+          onClick={() => genMut.mutate()}
+          disabled={genMut.isPending}
+          className="text-[11px] px-2.5 py-1 bg-purple-50 text-purple-700 border border-purple-200 rounded-lg hover:bg-purple-100 transition disabled:opacity-50"
+        >
+          {genMut.isPending ? 'Generating...' : 'Generate'}
+        </button>
+        {genMut.isError && <span className="text-[11px] text-red-500">Failed</span>}
+      </div>
+    )
+  }
+
+  if (cl.items.length === 0) return <p className="text-[11px] text-gray-400">No items extracted.</p>
+
+  const grouped = CATEGORIES.reduce<Record<string, ChecklistItem[]>>((acc, cat) => {
+    acc[cat] = cl.items.filter((i) => i.category === cat)
+    return acc
+  }, {} as Record<string, ChecklistItem[]>)
+
+  return (
+    <div className="space-y-3">
+      {CATEGORIES.filter((c) => grouped[c]?.length > 0).map((cat) => (
+        <div key={cat}>
+          <span className={'inline-flex text-[10px] font-semibold uppercase tracking-wider border rounded-full px-2 py-0.5 mb-1.5 ' + CAT_COLORS[cat]}>
+            {cat}
+          </span>
+          <ul className="space-y-1.5">
+            {grouped[cat].map((item, i) => (
+              <li key={i} className="flex items-start gap-2">
+                <span className={
+                  'shrink-0 mt-0.5 text-[10px] font-medium border rounded px-1 ' +
+                  (item.status === 'required' ? 'bg-orange-50 text-orange-700 border-orange-200' : 'bg-gray-50 text-gray-500 border-gray-200')
+                }>
+                  {item.status === 'required' ? 'REQ' : 'OPT'}
+                </span>
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-gray-800 leading-snug">{item.name}</p>
+                  {item.notes && <p className="text-[11px] text-gray-400 mt-0.5">{item.notes}</p>}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+      <div className="flex justify-end pt-1">
+        <button
+          onClick={() => genMut.mutate()}
+          disabled={genMut.isPending}
+          className="text-[10px] text-gray-300 hover:text-gray-500 transition disabled:opacity-50"
+        >
+          {genMut.isPending ? 'Regenerating...' : 'Regenerate'}
+        </button>
+      </div>
     </div>
   )
 }
