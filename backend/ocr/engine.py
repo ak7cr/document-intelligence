@@ -37,9 +37,9 @@ def _get_reader():
         except Exception:
             use_gpu = False
 
-        logger.info("Initialising EasyOCR (first run downloads models)… GPU=%s", use_gpu)
+        logger.info("Initialising EasyOCR (en+hi) — GPU=%s", use_gpu)
         _reader = easyocr.Reader(["en", "hi"], gpu=use_gpu)
-        logger.info("EasyOCR ready (en+hi, GPU=%s)", use_gpu)
+        logger.info("EasyOCR ready")
     return _reader
 
 
@@ -65,21 +65,35 @@ def _tile(img_array: np.ndarray) -> list[np.ndarray]:
     return strips
 
 
+_reader_cpu_only = False
+
+
+def _move_to_cpu(reader) -> None:
+    """Move EasyOCR's detector and recognizer to CPU permanently."""
+    global _reader_cpu_only
+    if _reader_cpu_only:
+        return
+    try:
+        import torch
+        torch.cuda.empty_cache()
+        reader.detector.to("cpu")
+        reader.recognizer.to("cpu")
+        _reader_cpu_only = True
+        logger.info("EasyOCR moved permanently to CPU due to VRAM pressure from other processes")
+    except Exception as exc:
+        logger.warning("Could not move EasyOCR to CPU: %s", exc)
+
+
 def _ocr_strip(reader, strip: np.ndarray) -> list[tuple[str, float]]:
-    """Run EasyOCR on one strip, with CPU fallback on OOM."""
+    """Run EasyOCR on one strip, falling back to CPU on OOM."""
     try:
         results = reader.readtext(strip, adjust_contrast=0.5, canvas_size=_CANVAS_SIZE)
     except RuntimeError as exc:
         if "out of memory" not in str(exc).lower():
             raise
-        logger.warning("GPU OOM on strip — retrying on CPU")
-        try:
-            import torch
-            torch.cuda.empty_cache()
-        except Exception:
-            pass
-        results = reader.readtext(strip, adjust_contrast=0.5, canvas_size=_CANVAS_SIZE,
-                                   gpu=False)
+        logger.warning("GPU OOM — moving EasyOCR to CPU for the rest of this session")
+        _move_to_cpu(reader)
+        results = reader.readtext(strip, adjust_contrast=0.5, canvas_size=_CANVAS_SIZE)
 
     kept = [(r[1], float(r[2])) for r in results if float(r[2]) >= _MIN_CONF]
     return kept or [(r[1], float(r[2])) for r in results]

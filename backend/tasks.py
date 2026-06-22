@@ -34,6 +34,28 @@ from vector import delete_doc_vectors, embed_passages, upsert_chunks
 logger = logging.getLogger(__name__)
 
 
+def _unload_ollama() -> None:
+    """Ask Ollama to evict its model from VRAM so OCR has full GPU access.
+    Ollama reloads the model automatically on the next LLM call (run_analysis).
+    No-op when LLM_PROVIDER != ollama or Ollama is unreachable.
+    """
+    import os
+    if os.getenv("LLM_PROVIDER", "ollama") != "ollama":
+        return
+    try:
+        import requests
+        host = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+        model = os.getenv("OLLAMA_MODEL", "llama3.2")
+        requests.post(
+            f"{host}/api/generate",
+            json={"model": model, "keep_alive": 0},
+            timeout=5,
+        )
+        logger.info("Ollama model unloaded from VRAM — GPU free for OCR")
+    except Exception as exc:
+        logger.debug("Could not unload Ollama model: %s", exc)
+
+
 # ── Phase 1: parse + index ────────────────────────────────────────────────────
 
 @celery.task(bind=True, name="process_document", max_retries=3, default_retry_delay=15)
@@ -60,6 +82,9 @@ def _process(task, doc_id: str) -> None:
         finally:
             response.close()
             response.release_conn()
+
+        # ── Free GPU before OCR ───────────────────────────────────────────────
+        _unload_ollama()
 
         # ── Extract text / OCR ────────────────────────────────────────────────
         result = dispatch(doc.filetype, data)
