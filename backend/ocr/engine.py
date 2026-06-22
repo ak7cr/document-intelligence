@@ -17,7 +17,6 @@ from PIL import Image
 
 logger = logging.getLogger(__name__)
 
-_ENGINE = os.getenv("OCR_ENGINE", "easyocr").lower()
 
 _reader = None
 
@@ -92,7 +91,7 @@ def ocr_image(img_bytes: bytes) -> tuple[str, float]:
     Returns:
         (text, avg_confidence) — confidence is 0.0 if nothing detected.
     """
-    if _ENGINE == "tesseract":
+    if os.getenv("OCR_ENGINE", "easyocr").lower() == "tesseract":
         from .tesseract_engine import ocr_image_tesseract
         return ocr_image_tesseract(img_bytes)
 
