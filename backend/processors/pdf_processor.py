@@ -12,6 +12,37 @@ def _is_scanned(text: str) -> bool:
     return len(text.strip().split()) < _SCANNED_WORD_THRESHOLD
 
 
+def _extract_tables(page: fitz.Page) -> str:
+    """Extract tables from a page as markdown using PyMuPDF's table finder.
+
+    Works on both native-text and scanned pages rendered at high DPI.
+    Returns empty string if no tables are detected.
+    """
+    try:
+        # Render at 3x for table detection on scanned pages
+        mat = fitz.Matrix(3.0, 3.0)
+        clip = page.rect
+        tabs = page.find_tables(clip=clip)
+        if not tabs or not tabs.tables:
+            return ""
+        parts = []
+        for tab in tabs.tables:
+            rows = tab.extract()
+            if not rows:
+                continue
+            # Build markdown table
+            lines = []
+            for i, row in enumerate(rows):
+                cells = [str(c or "").replace("\n", " ").strip() for c in row]
+                lines.append("| " + " | ".join(cells) + " |")
+                if i == 0:
+                    lines.append("| " + " | ".join(["---"] * len(cells)) + " |")
+            parts.append("\n".join(lines))
+        return "\n\n".join(parts)
+    except Exception:
+        return ""
+
+
 def _render_page(page: fitz.Page) -> bytes:
     """Render a PDF page to a PNG at 3× zoom (≈216 DPI) for OCR.
 
@@ -39,10 +70,14 @@ def extract_pdf(data: bytes) -> ProcessingResult:
             img_bytes = _render_page(page)
             enhanced = enhance_for_ocr(img_bytes)
             ocr_text, conf = ocr_image(enhanced)
-            all_texts.append(ocr_text)
+            # Append table markdown before prose so LLM sees structured data
+            table_md = _extract_tables(page)
+            if table_md:
+                all_texts.append(table_md + "\n\n" + ocr_text)
+            else:
+                all_texts.append(ocr_text)
             if conf > 0:
                 ocr_confidences.append(conf)
-            # Free GPU VRAM between pages so allocations don't accumulate
             try:
                 import torch
                 if torch.cuda.is_available():
@@ -50,7 +85,8 @@ def extract_pdf(data: bytes) -> ProcessingResult:
             except Exception:
                 pass
         else:
-            all_texts.append(text)
+            table_md = _extract_tables(page)
+            all_texts.append((table_md + "\n\n" + text).strip() if table_md else text)
 
     doc.close()
 
