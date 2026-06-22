@@ -84,6 +84,7 @@ def _migrate() -> None:
             ("documents",     "bucket",         "VARCHAR(100)"),
             ("documents",     "object_key",     "VARCHAR(512)"),
             ("document_text", "ocr_confidence", "FLOAT"),
+            ("document_text", "ocr_engine",     "VARCHAR(50)"),
         ]:
             conn.execute(text(
                 f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {col} {definition}"
