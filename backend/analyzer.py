@@ -70,7 +70,12 @@ def _call_ollama(prompt: str) -> str:
     import requests
     resp = requests.post(
         f"{os.getenv('OLLAMA_HOST', 'http://localhost:11434')}/api/generate",
-        json={"model": os.getenv("OLLAMA_MODEL", "llama3.2"), "prompt": prompt, "stream": False},
+        json={
+            "model": os.getenv("OLLAMA_MODEL", "llama3.2"),
+            "prompt": prompt,
+            "stream": False,
+            "format": "json",  # forces valid JSON output regardless of model behaviour
+        },
         timeout=180,
     )
     resp.raise_for_status()

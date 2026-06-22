@@ -33,7 +33,7 @@ def _ollama(prompt: str) -> str:
     try:
         resp = requests.post(
             f"{OLLAMA_HOST}/api/generate",
-            json={"model": OLLAMA_MODEL, "prompt": prompt, "stream": False},
+            json={"model": OLLAMA_MODEL, "prompt": prompt, "stream": False, "format": "json"},
             timeout=120,
         )
         resp.raise_for_status()

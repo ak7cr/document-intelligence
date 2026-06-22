@@ -5,6 +5,7 @@ python-dotenv
 pgvector
 minio
 pymupdf
+pymupdf_layout
 python-docx
 openpyxl
 pandas
