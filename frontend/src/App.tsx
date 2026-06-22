@@ -91,23 +91,25 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Right side: search (Documents tab) + Export button */}
-                <div className="flex items-start gap-3 mt-1 shrink-0">
+                {/* Right side: OCR picker + search (Documents tab) + Export */}
+                <div className="flex items-center gap-2 mt-1 shrink-0">
+                  {/* OCR engine selector — always visible */}
+                  <div className="flex items-center gap-0.5 bg-gray-100 rounded-lg p-0.5">
+                    {(['gemini', 'easyocr', 'tesseract'] as OcrEngine[]).map((e) => (
+                      <button
+                        key={e}
+                        onClick={() => handleOcrChange(e)}
+                        title={'OCR: ' + e}
+                        className={'px-2 py-1 text-[10px] font-semibold rounded-md transition ' +
+                          (ocrEngine === e ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-400 hover:text-gray-600')}
+                      >
+                        {e === 'easyocr' ? 'EasyOCR' : e.charAt(0).toUpperCase() + e.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+
                   {tab === 'documents' && (
-                    <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-0.5 bg-gray-100 rounded-lg p-0.5">
-                      {(['gemini', 'easyocr', 'tesseract'] as OcrEngine[]).map((e) => (
-                        <button
-                          key={e}
-                          onClick={() => handleOcrChange(e)}
-                          className={'px-2 py-1 text-[10px] font-medium rounded-md transition ' +
-                            (ocrEngine === e ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700')}
-                        >
-                          {e === 'easyocr' ? 'EasyOCR' : e.charAt(0).toUpperCase() + e.slice(1)}
-                        </button>
-                      ))}
-                    </div>
-                    <div className="relative w-56">
+                    <div className="relative w-48">
                       <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm select-none">
                         &#128269;
                       </span>
@@ -125,7 +127,6 @@ export default function App() {
                           x
                         </button>
                       )}
-                    </div>
                     </div>
                   )}
                   <ExportMenu sessionId={activeSession.id} sessionName={activeSession.name} />
