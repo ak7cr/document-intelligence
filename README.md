@@ -1,55 +1,98 @@
 # Document Intelligence
 
-A full-stack document intelligence platform for tender and procurement analysis. Upload PDF, Word, Excel, or scanned documents (including Hindi/multilingual) and get AI-powered entity extraction, summarization, risk prediction, eligibility checking, deadline tracking, semantic chat, and cross-document entity graphs — all in a session-based workspace.
+A full-stack document intelligence platform for tender and procurement analysis. Upload PDF, Word, Excel, or scanned documents (including Hindi/multilingual) and get AI-powered entity extraction, summarization, deadline tracking, semantic chat, and cross-document entity graphs — all in a session-based workspace.
+
+---
+
+## Quick Start (Windows / Linux / Mac — Docker)
+
+The easiest way to run the app is with Docker. No Python or Node.js setup needed.
+
+### Prerequisites
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed and running
+- A Gemini API key — get one free at [aistudio.google.com](https://aistudio.google.com)
+
+### Steps
+
+**1. Copy the environment file:**
+```bash
+# Linux / Mac
+cp .env.example .env
+
+# Windows (Command Prompt)
+copy .env.example .env
+```
+
+**2. Open `.env` and set your Gemini API key:**
+```env
+GEMINI_API_KEY=your-key-here
+```
+
+**3. Start the app:**
+```bash
+# Linux / Mac
+docker compose up --build -d
+
+# Windows — double-click start.bat  OR run in Command Prompt:
+docker compose up --build -d
+```
+
+**4. Open your browser:**
+```
+http://localhost
+```
+
+> First startup downloads Docker images and builds the app (~5–10 minutes). Subsequent starts take ~20 seconds.
+
+**To stop:**
+```bash
+docker compose down
+
+# Windows — double-click stop.bat
+```
+
+**To view logs:**
+```bash
+docker compose logs -f
+```
 
 ---
 
 ## Features
 
 ### Document Processing
-- **Multi-format support** — PDF (native + scanned), DOCX, XLSX, CSV, PNG/JPG/TIFF
-- **Two-phase async pipeline** — OCR/extraction → indexed and searchable immediately; LLM analysis fills in metadata after
+- **Multi-format** — PDF (native text + scanned), DOCX, XLSX, CSV, PNG/JPG/TIFF
+- **Two-phase async pipeline** — OCR/extraction completes first; document is immediately searchable. LLM analysis (entities, summary, checklist) runs after in the background.
 - **Multilingual OCR** — Hindi (Devanagari) + English in the same document
-- **Switchable OCR engine** — Gemini Vision (best quality), EasyOCR (local GPU), Tesseract (CPU-only)
-- **OCR fallback chain** — Gemini → EasyOCR → Tesseract; fallback shown as a badge on the document card
-- **Table extraction** — PyMuPDF table finder extracts structured tables as markdown before OCR text
-- **Scanned PDF tiling** — tall pages split into strips to stay within GPU VRAM limits
+- **Switchable OCR engine** — Gemini Vision (best), EasyOCR (local GPU), Tesseract (CPU-only). Switch via pill buttons in the session header — no restart needed.
+- **OCR fallback chain** — Gemini → EasyOCR → Tesseract. Fallback shown as a warning badge on the document card.
+- **Table extraction** — PyMuPDF table finder converts tables to markdown before OCR for better LLM understanding
 
-### AI Analysis
-- **Entity extraction** — document type, dates, deadlines, parties, amounts, reference numbers; 10+ entities per document targeted
-- **Smart summarization** — headline, paragraph summary, key bullet points
-- **Risk prediction** — low/medium/high risk, confidence score, timeline urgency, risk factors, opportunities, recommended actions
-- **All three in one LLM call** per document (structured output with JSON Schema for Ollama)
-- **Hindi/multilingual** — analysis responds in English with proper nouns preserved in source language
+### AI Analysis (auto-runs on every upload)
+- **Entity extraction** — document type, dates, deadlines, parties, amounts, reference numbers (10+ entities targeted)
+- **Summarization** — headline, paragraph summary, key bullet points
+- **Bid submission checklist** — items grouped by Technical / Financial / Legal / Administrative categories; shown in the document's Checklist tab
+- **Hindi/multilingual** — analysis responds in English, proper nouns preserved in original script
 
-### Verification Layer (Chat)
-- **DB-first grounding** — entities, summaries, and predictions are injected as verified facts before chunk context
-- **Cross-encoder reranking** — `cross-encoder/ms-marco-MiniLM-L-6-v2` reranks Qdrant results before the LLM sees them
-- **Confidence scoring** — high/medium/low badge on every AI answer
-- **Persistent chat history** — messages saved per session, survive page refresh, cleared per session
-- **Markdown rendering** — bullet points, bold, headings rendered natively in the chat UI
+### Chat (RAG)
+- **Ask questions** about any document in the session
+- **Verified facts grounding** — entities and summaries are injected before chunk context so factual answers (amounts, dates, names) come from structured data, not guesswork
+- **Cross-encoder reranking** — `cross-encoder/ms-marco-MiniLM-L-6-v2` reranks retrieved chunks before the LLM sees them
+- **Confidence badge** — high / medium / low on every answer
+- **Persistent history** — chat saved per session, survives page refresh; Clear button to wipe it
+- **Markdown rendering** — bullet points, bold, headings render natively
 
-### Eligibility & Compliance (Phase B)
-- **Company profile** — set once per session; stored and reused across all documents
-- **Eligibility checker** — compares company profile against each tender's criteria; scores 0–100 with met/missing breakdown and document checklist
-- **Bid submission checklist** — auto-generated per document (Technical / Financial / Legal / Administrative categories)
-- **Auto-run** — eligibility and checklist run automatically on every new document upload if a profile exists
-
-### Deadline Tracker
-- **Timeline tab** — all date/deadline entities across the session, sorted chronologically, color-coded by urgency (critical <7 days, soon <30 days, future, past)
-
-### Cross-Document Entity Graph
-- **Graph tab** — entities appearing in 2+ documents shown as clusters (parties, amounts, dates, references)
-- **Run All Analysis** button — retroactively runs checklist + eligibility on all ready documents
+### Document Tabs
+- **Documents** — upload, view, delete; OCR engine selector; per-document insights (Summary / Entities / Checklist)
+- **Chat** — ask questions, get grounded answers with source citations
+- **Compare** — compare 2–8 documents side-by-side (AI-generated differences, similarities, recommendation)
+- **Timeline** — all dates and deadlines across the session, sorted chronologically, color-coded by urgency
+- **Graph** — entities appearing in 2+ documents shown as clusters (cross-document connections)
 
 ### Export
 - **Excel (.xlsx)** — Documents, Summaries, Entities sheets
 - **CSV** — entities or summaries
 - **JSON** — full structured data dump
-
-### OCR Quality
-- **OCR Review Banner** — amber warning above document list for any OCR-processed document below 70% confidence
-- **OCR engine selector** — pill buttons in the session header to switch Gemini / EasyOCR / Tesseract without restarting
 
 ---
 
@@ -57,64 +100,56 @@ A full-stack document intelligence platform for tender and procurement analysis.
 
 ```
 frontend/              React 19 + TypeScript + Tailwind CSS v4 + Vite
+                       Served via nginx on port 80; /api/* proxied to backend
+
 backend/
-  app.py               Flask app factory + idempotent DB migration
+  app.py               Flask app factory + idempotent DB column migrations
   tasks.py             Two-phase Celery pipeline:
-                         process_document  → OCR + chunk + embed → ready
-                         run_analysis      → LLM entities/summary/risk/checklist/eligibility
-  analyzer.py          Combined LLM call (entities + summary + prediction), JSON Schema constrained
-  rag.py               RAG: verified DB facts + cross-encoder reranking + Gemini/Ollama
-  reranker.py          cross-encoder/ms-marco-MiniLM-L-6-v2 reranker
+                         process_document → OCR + chunk + embed → status "ready"
+                         run_analysis     → entities + summary + checklist (LLM)
+  analyzer.py          Single LLM call: entities + summary (JSON Schema constrained)
   checklist.py         Bid submission checklist LLM module
-  eligibility.py       Eligibility/compliance checker LLM module
-  config.py            Runtime config store (OCR engine switchable via API)
+  rag.py               RAG: DB verified facts + cross-encoder reranking + LLM answer
+  reranker.py          cross-encoder/ms-marco-MiniLM-L-6-v2
+  config.py            Runtime OCR engine config (switchable without restart)
   routes/
-    sessions.py        Sessions, analytics, compare, timeline, entity-graph, run-analysis, OCR review
-    documents.py       Documents, entities, summary, prediction, eligibility, checklist
-    chat.py            Chat (RAG), persistent message history, clear
+    sessions.py        Sessions, compare, timeline, entity-graph, OCR review
+    documents.py       Documents, entities, summary, checklist
+    chat.py            Chat (RAG) + persistent message history
     config.py          GET/POST /config/ocr-engine
-    export.py          XLSX, CSV, JSON exports
+    export.py          XLSX, CSV, JSON
   ocr/
-    engine.py          OCR dispatcher + EasyOCR backend (GPU tiling + CPU fallback)
-    gemini_engine.py   Gemini Vision OCR with retry + EasyOCR/Tesseract fallback chain
-    tesseract_engine.py Tesseract backend (hin+eng)
+    engine.py          OCR dispatcher + EasyOCR (GPU tiling, CPU fallback)
+    gemini_engine.py   Gemini Vision OCR — retry on 503 + EasyOCR/Tesseract fallback
+    tesseract_engine.py Tesseract (hin+eng)
     enhancer.py        Image preprocessing for scanned PDFs
   processors/          PDF / DOCX / XLSX / CSV / image extractors + table finder
-  vector/              Qdrant embedding (bge-small-en-v1.5, CPU) + cross-encoder reranking
-  llm/client.py        Ollama + Gemini dispatch layer
-  models.py            SQLAlchemy: Session, Document, DocumentText, ChatHistory,
-                                   DocumentChunk, DocumentEntity, DocumentSummary,
-                                   DocumentPrediction, DocumentChecklist, EligibilityCheck,
-                                   CompanyProfile, DocumentChecklist
+  vector/              Qdrant embedding (bge-small-en-v1.5, CPU) + reranking
+  llm/client.py        Ollama + Gemini dispatch
+
+Infrastructure (Docker):
+  PostgreSQL 16        All structured data
+  MinIO                Object storage for uploaded files
+  Redis                Celery task broker
+  Qdrant               Vector database for semantic search
 ```
 
-**Infrastructure:**
-- PostgreSQL 16 — all structured data
-- MinIO — object storage for uploaded files
-- Redis — Celery task broker
-- Qdrant — vector database for semantic search
-
 ---
 
-## Prerequisites
+## Development Setup (without Docker)
 
-- Python 3.10+ (3.14 tested)
+Use this if you want to run the code directly and make changes.
+
+### Prerequisites
+- Python 3.10+
 - Node.js 18+
-- Docker + Docker Compose
-- GPU recommended (NVIDIA, 6+ GB VRAM) — OCR runs on CPU if VRAM is insufficient
-- A Gemini API key (free at [aistudio.google.com](https://aistudio.google.com)) **or** Ollama installed locally
-
----
-
-## Setup
+- Docker (for PostgreSQL, MinIO, Redis, Qdrant only)
 
 ### 1. Start infrastructure
 
 ```bash
-docker compose up -d
+docker compose up postgres redis minio qdrant -d
 ```
-
-Starts PostgreSQL, MinIO, Redis, and Qdrant.
 
 ### 2. Backend
 
@@ -125,71 +160,59 @@ source venv/bin/activate        # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-For Tesseract OCR (optional, CPU-only):
+For Hindi OCR via Tesseract (optional):
 ```bash
+# Linux
 apt-get install tesseract-ocr tesseract-ocr-hin tesseract-ocr-eng
 ```
 
-Copy and configure the environment file:
-
+Copy and configure environment:
 ```bash
 cp rename.env .env
 ```
 
 Edit `.env`:
-
 ```env
 DATABASE_URL=postgresql://admin:adminpassword@localhost:5432/tender_rag
-SECRET_KEY=change-me-in-production
-
 REDIS_URL=redis://localhost:6379/0
-
 MINIO_ENDPOINT=localhost:9000
 MINIO_ACCESS_KEY=minioadmin
 MINIO_SECRET_KEY=minioadmin
 MINIO_BUCKET=tender-documents
 MINIO_SECURE=false
-
 QDRANT_HOST=localhost
 QDRANT_PORT=6333
 
-# LLM provider — choose one:
+# LLM — choose one:
 LLM_PROVIDER=gemini
 GEMINI_API_KEY=your-key-here
 GEMINI_MODEL=gemini-2.0-flash
 
 # LLM_PROVIDER=ollama
 # OLLAMA_HOST=http://localhost:11434
-# OLLAMA_MODEL=qwen2:7b        # qwen2 recommended for Hindi/multilingual
+# OLLAMA_MODEL=qwen2:7b
 
-# OCR engine — choose one:
-# OCR_ENGINE=gemini             # Best quality, uses GEMINI_API_KEY, 1 call/page
-# OCR_ENGINE=easyocr            # Local GPU (default)
-# OCR_ENGINE=tesseract          # Local CPU, needs apt packages above
+# OCR engine — gemini (best), easyocr (local GPU), tesseract (CPU)
 OCR_ENGINE=gemini
 
-# Optional performance tuning:
-PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
-HF_TOKEN=hf_your_token_here    # Suppresses HuggingFace rate-limit warnings
+SECRET_KEY=change-me-in-production
 ```
 
-### 3. Start the Flask API
+### 3. Start Flask API
 
 ```bash
 flask --app app run --port 5001 --debug
 ```
 
-Schema is created automatically on first start (`db.create_all()` + idempotent `_migrate()`).
+Schema is created automatically on first start.
 
-### 4. Start the Celery worker
-
-In a separate terminal:
+### 4. Start Celery worker
 
 ```bash
 celery -A celery_worker worker --loglevel=info
 ```
 
-> `solo` pool is configured automatically in `celery_app.py` (required for PaddleOCR/EasyOCR compatibility on all platforms).
+> `solo` pool is set in code — required because EasyOCR / PyTorch cannot survive `fork()`.
 
 ### 5. Frontend
 
@@ -208,25 +231,31 @@ Open [http://localhost:5173](http://localhost:5173).
 | | Gemini | Ollama (qwen2:7b) |
 |---|---|---|
 | Cost | 1500 req/day free | Free, unlimited |
-| Speed | Fast | Slower (local hardware) |
+| Speed | Fast | Slower (depends on hardware) |
 | Privacy | Data sent to Google | 100% local |
-| Hindi quality | Excellent | Good |
-| JSON schema | Native | Constrained decoding |
+| Hindi / multilingual | Excellent | Good |
+| JSON schema compliance | Native | Constrained decoding |
 | Best for | Production, Hindi docs | Offline, high-volume |
 
-**Recommended for Hindi/multilingual documents:** `OCR_ENGINE=gemini` + `LLM_PROVIDER=gemini`
+**Recommended for Hindi documents:** `OCR_ENGINE=gemini` + `LLM_PROVIDER=gemini`
+
+For Ollama, install from [ollama.com](https://ollama.com) and pull a model:
+```bash
+ollama pull qwen2:7b
+```
+On Windows with Docker, Ollama on the host is reachable at `http://host.docker.internal:11434`.
 
 ---
 
 ## OCR Engine Comparison
 
-| Engine | Accuracy | VRAM | Hindi | Notes |
+| Engine | Quality | GPU | Hindi | Notes |
 |---|---|---|---|---|
-| Gemini | Best | None (cloud) | Native | 1 API call per page; retries on 503 with EasyOCR→Tesseract fallback |
-| EasyOCR | Good | ~1 GB | Good | GPU tiling for large pages; moves to CPU if VRAM full |
-| Tesseract | Decent | None | Requires `tesseract-ocr-hin` | Fast, CPU-only |
+| Gemini | Best | No (cloud) | Native | 1 API call per page; fallback to EasyOCR → Tesseract on error |
+| EasyOCR | Good | Optional | Good | GPU tiling prevents OOM; moves to CPU if VRAM full |
+| Tesseract | Decent | No (CPU) | Needs `tesseract-ocr-hin` | Fast, works everywhere |
 
-The active engine can be switched from the **session header** without restarting the worker.
+Switch engine via the pill buttons in the session header — takes effect immediately for the next upload.
 
 ---
 
@@ -238,56 +267,50 @@ All endpoints are prefixed with `/api`.
 | Method | Path | Description |
 |---|---|---|
 | GET | `/sessions` | List all sessions |
-| POST | `/sessions` | Create a session |
+| POST | `/sessions` | Create a session `{"name": "...", "description": "..."}` |
 | DELETE | `/sessions/<id>` | Delete session and all its data |
-| POST | `/sessions/<id>/chat` | Chat with documents (RAG) |
-| GET | `/sessions/<id>/messages` | Get persistent chat history |
+| POST | `/sessions/<id>/chat` | Chat with documents `{"question": "..."}` |
+| GET | `/sessions/<id>/messages` | Persistent chat history |
 | DELETE | `/sessions/<id>/messages` | Clear chat history |
-| GET | `/sessions/<id>/search` | Semantic search (`?q=query`) |
-| POST | `/sessions/<id>/compare` | Compare 2–8 documents |
-| GET | `/sessions/<id>/analytics` | Session analytics |
-| GET | `/sessions/<id>/timeline` | Deadline/date timeline |
+| GET | `/sessions/<id>/search` | Semantic search `?q=query` |
+| POST | `/sessions/<id>/compare` | Compare docs `{"doc_ids": [...]}` |
+| GET | `/sessions/<id>/timeline` | Date/deadline timeline |
 | GET | `/sessions/<id>/entity-graph` | Cross-document entity clusters |
-| POST | `/sessions/<id>/run-analysis` | Batch run checklist + eligibility |
-| GET | `/sessions/<id>/ocr-review` | Documents with low OCR confidence |
-| GET | `/sessions/<id>/profile` | Get company profile |
-| POST | `/sessions/<id>/profile` | Upsert company profile |
+| GET | `/sessions/<id>/ocr-review` | Docs with low OCR confidence |
 
 ### Documents
 | Method | Path | Description |
 |---|---|---|
-| POST | `/documents` | Upload a document (multipart) |
+| POST | `/documents` | Upload a document (multipart `file` + `session_id`) |
 | GET | `/documents/<session_id>` | List documents in a session |
 | DELETE | `/documents/<id>` | Delete document + vectors |
-| GET | `/documents/<id>/entities` | Get extracted entities |
+| GET | `/documents/<id>/entities` | Extracted entities |
 | POST | `/documents/<id>/extract` | Re-run entity extraction |
-| GET | `/documents/<id>/summary` | Get summary |
+| GET | `/documents/<id>/summary` | Document summary |
 | POST | `/documents/<id>/summarize` | Re-run summarization |
-| GET | `/documents/<id>/prediction` | Get risk prediction |
-| POST | `/documents/<id>/predict` | Re-run risk prediction |
-| GET | `/documents/<id>/eligibility` | Get eligibility check result |
-| POST | `/documents/<id>/eligibility` | Run eligibility check |
-| GET | `/documents/<id>/checklist` | Get bid submission checklist |
-| POST | `/documents/<id>/checklist` | Generate bid submission checklist |
-| GET | `/documents/<id>/url` | Get presigned download URL |
+| GET | `/documents/<id>/checklist` | Bid submission checklist |
+| POST | `/documents/<id>/checklist` | Generate / regenerate checklist |
+| GET | `/documents/<id>/url` | Presigned download URL |
 
 ### Config
 | Method | Path | Description |
 |---|---|---|
 | GET | `/config/ocr-engine` | Get active OCR engine |
-| POST | `/config/ocr-engine` | Switch OCR engine at runtime |
+| POST | `/config/ocr-engine` | Switch engine `{"ocr_engine": "gemini"}` |
 
 ### Export
 | Method | Path | Description |
 |---|---|---|
 | GET | `/sessions/<id>/export/xlsx` | Excel workbook |
-| GET | `/sessions/<id>/export/csv` | CSV (`?sheet=entities\|summaries`) |
+| GET | `/sessions/<id>/export/csv` | CSV `?sheet=entities\|summaries` |
 | GET | `/sessions/<id>/export/json` | Full JSON dump |
 
 ---
 
 ## Tech Stack
 
-**Backend:** Flask · SQLAlchemy · PostgreSQL · Celery + Redis · MinIO · Qdrant · EasyOCR · Tesseract · PyMuPDF · sentence-transformers (`BAAI/bge-small-en-v1.5`, CPU) · `cross-encoder/ms-marco-MiniLM-L-6-v2` · google-genai · python-docx · openpyxl
+**Backend:** Flask · SQLAlchemy · PostgreSQL · Celery + Redis · MinIO · Qdrant · EasyOCR · Tesseract · PyMuPDF · sentence-transformers (`BAAI/bge-small-en-v1.5`, CPU) · `cross-encoder/ms-marco-MiniLM-L-6-v2` · google-genai · python-docx · openpyxl · pymupdf_layout
 
 **Frontend:** React 19 · TypeScript · Tailwind CSS v4 · Vite · TanStack Query v5 · Axios · react-markdown
+
+**Deployment:** Docker Compose · nginx (reverse proxy + SPA serving)
