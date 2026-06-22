@@ -113,26 +113,26 @@ def _ocr_strip(reader, strip: np.ndarray) -> list[tuple[str, float]]:
     return kept or [(r[1], float(r[2])) for r in results]
 
 
-def ocr_image(img_bytes: bytes) -> tuple[str, float]:
+def ocr_image(img_bytes: bytes) -> tuple[str, float, str]:
     """Run OCR on raw image bytes using the configured backend.
 
-    OCR_ENGINE=gemini    — Gemini Vision (best quality, needs GEMINI_API_KEY)
-    OCR_ENGINE=tesseract — Tesseract (CPU, needs apt packages)
-    OCR_ENGINE=easyocr   — EasyOCR (default, GPU/CPU)
-
     Returns:
-        (text, avg_confidence) — confidence is 0.0 if nothing detected.
+        (text, avg_confidence, engine_used) — confidence 0.0 if nothing detected.
+        engine_used is one of: 'gemini' | 'easyocr' | 'tesseract' |
+                               'easyocr:fallback' | 'tesseract:fallback'
     """
     from config import get_ocr_engine
     engine = get_ocr_engine()
 
     if engine == "gemini":
         from .gemini_engine import ocr_image_gemini
-        return ocr_image_gemini(img_bytes)
+        text, conf, used = ocr_image_gemini(img_bytes)
+        return text, conf, used
 
     if engine == "tesseract":
         from .tesseract_engine import ocr_image_tesseract
-        return ocr_image_tesseract(img_bytes)
+        text, conf = ocr_image_tesseract(img_bytes)
+        return text, conf, "tesseract"
 
     reader = _get_reader()
 
@@ -154,7 +154,7 @@ def ocr_image(img_bytes: bytes) -> tuple[str, float]:
             pass
 
     if not all_texts:
-        return "", 0.0
+        return "", 0.0, "easyocr"
 
     avg_confidence = sum(all_scores) / len(all_scores) if all_scores else 0.0
-    return "\n".join(all_texts), avg_confidence
+    return "\n".join(all_texts), avg_confidence, "easyocr"

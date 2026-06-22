@@ -108,6 +108,7 @@ def _process(task, doc_id: str) -> None:
             existing.page_count = result.page_count
             existing.method = result.method
             existing.ocr_confidence = result.confidence
+            existing.ocr_engine = result.ocr_engine
         else:
             db.session.add(DocumentText(
                 document_id=doc_id,
@@ -116,6 +117,7 @@ def _process(task, doc_id: str) -> None:
                 page_count=result.page_count,
                 method=result.method,
                 ocr_confidence=result.confidence,
+                ocr_engine=result.ocr_engine,
             ))
 
         # ── Chunk ─────────────────────────────────────────────────────────────

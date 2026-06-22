@@ -177,6 +177,14 @@ function DocRow({ doc, onDelete }: { doc: Document; onDelete: () => void }) {
           {isProcessing && <span className="w-2 h-2 rounded-full bg-current animate-pulse inline-block" />}
           {doc.status}
         </span>
+        {doc.ocr_engine && doc.ocr_engine.includes(':fallback') && (
+          <span
+            title={'Gemini OCR unavailable — used ' + doc.ocr_engine.split(':')[0] + ' as fallback. Re-upload when Gemini is available for best results.'}
+            className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-medium shrink-0 bg-amber-50 text-amber-700 border border-amber-200 cursor-help"
+          >
+            &#9888; OCR fallback
+          </span>
+        )}
 
         {doc.status === 'ready' && (
           <button

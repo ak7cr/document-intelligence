@@ -61,6 +61,7 @@ def extract_pdf(data: bytes) -> ProcessingResult:
     all_texts: list[str] = []
     had_ocr = False
     ocr_confidences: list[float] = []
+    ocr_engines_used: set[str] = set()
 
     for page in doc:
         text = page.get_text("text")
@@ -69,7 +70,8 @@ def extract_pdf(data: bytes) -> ProcessingResult:
             had_ocr = True
             img_bytes = _render_page(page)
             enhanced = enhance_for_ocr(img_bytes)
-            ocr_text, conf = ocr_image(enhanced)
+            ocr_text, conf, used_engine = ocr_image(enhanced)
+            ocr_engines_used.add(used_engine)
             # Append table markdown before prose so LLM sees structured data
             table_md = _extract_tables(page)
             if table_md:
@@ -94,9 +96,17 @@ def extract_pdf(data: bytes) -> ProcessingResult:
         sum(ocr_confidences) / len(ocr_confidences) if ocr_confidences else None
     )
 
+    # Summarise which engine(s) ran — prefer showing fallback if any page used it
+    if had_ocr and ocr_engines_used:
+        primary = sorted(ocr_engines_used, key=lambda e: (":fallback" not in e, e))[0]
+        engine_label = primary
+    else:
+        engine_label = None
+
     return ProcessingResult(
         text="\n\n".join(all_texts),
         method="ocr" if had_ocr else "direct",
         page_count=page_count,
         confidence=avg_confidence,
+        ocr_engine=engine_label,
     )

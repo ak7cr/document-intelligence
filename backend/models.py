@@ -107,6 +107,7 @@ class Document(db.Model):
         if self.text:
             data["word_count"] = self.text.word_count
             data["page_count"] = self.text.page_count
+            data["ocr_engine"] = self.text.ocr_engine
         return data
 
 
@@ -123,8 +124,9 @@ class DocumentText(db.Model):
     raw_text = db.Column(db.Text, nullable=False, default="")
     page_count = db.Column(db.Integer, nullable=True)
     word_count = db.Column(db.Integer, nullable=False, default=0)
-    method = db.Column(db.String(50), default="direct")  # 'direct' | 'ocr' | 'ocr_pending'
+    method = db.Column(db.String(50), default="direct")  # 'direct' | 'ocr'
     ocr_confidence = db.Column(db.Float, nullable=True)  # 0.0–1.0, None for direct
+    ocr_engine = db.Column(db.String(50), nullable=True)  # 'gemini' | 'easyocr' | 'tesseract' | '*:fallback'
     extracted_at = db.Column(db.DateTime, default=_now)
 
     def to_dict(self) -> dict:

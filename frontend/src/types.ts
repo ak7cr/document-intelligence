@@ -17,6 +17,7 @@ export interface Document {
   word_count: number | null
   page_count: number | null
   chunk_count: number
+  ocr_engine: string | null
 }
 
 export interface DocumentChunk {

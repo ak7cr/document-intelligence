@@ -19,7 +19,7 @@ from PIL import Image
 logger = logging.getLogger(__name__)
 
 
-def ocr_image_gemini(img_bytes: bytes) -> tuple[str, float]:
+def ocr_image_gemini(img_bytes: bytes) -> tuple[str, float, str]:
     """Extract text from an image using Gemini Vision.
 
     Returns:
@@ -66,7 +66,7 @@ def ocr_image_gemini(img_bytes: bytes) -> tuple[str, float]:
                 ],
             )
             text = (response.text or "").strip()
-            return text, 0.95 if text else 0.0
+            return text, 0.95 if text else 0.0, "gemini"
         except Exception as exc:
             last_exc = exc
             msg = str(exc)
@@ -99,7 +99,7 @@ def ocr_image_gemini(img_bytes: bytes) -> tuple[str, float]:
         if text.strip():
             conf = sum(all_scores) / len(all_scores) if all_scores else 0.0
             logger.info("EasyOCR fallback succeeded")
-            return text, conf
+            return text, conf, "easyocr:fallback"
     except Exception as exc:
         logger.warning("EasyOCR fallback failed: %s — trying Tesseract", exc)
 
@@ -108,7 +108,7 @@ def ocr_image_gemini(img_bytes: bytes) -> tuple[str, float]:
         from .tesseract_engine import ocr_image_tesseract
         text, conf = ocr_image_tesseract(img_bytes)
         logger.info("Tesseract fallback succeeded")
-        return text, conf
+        return text, conf, "tesseract:fallback"
     except Exception as exc:
         logger.error("Tesseract fallback also failed: %s", exc)
-        return "", 0.0
+        return "", 0.0, "none:failed"
