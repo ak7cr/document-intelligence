@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import Markdown from 'react-markdown'
-import { chatSession } from '../api/chat'
+import { chatSession, fetchMessages, clearMessages } from '../api/chat'
 import type { ChatMessage, ChatSource } from '../types'
 
 interface Props {
@@ -11,11 +11,28 @@ export default function ChatPanel({ sessionId }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [clearing, setClearing] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
+
+  // Load persisted history when session changes
+  useEffect(() => {
+    setMessages([])
+    fetchMessages(sessionId).then(setMessages).catch(() => {})
+  }, [sessionId])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading])
+
+  async function handleClear() {
+    setClearing(true)
+    try {
+      await clearMessages(sessionId)
+      setMessages([])
+    } finally {
+      setClearing(false)
+    }
+  }
 
   async function send() {
     const question = input.trim()
@@ -106,6 +123,16 @@ export default function ChatPanel({ sessionId }: Props) {
           >
             Send
           </button>
+          {messages.length > 0 && (
+            <button
+              onClick={handleClear}
+              disabled={clearing}
+              title="Clear chat history"
+              className="px-3 py-2.5 text-xs text-gray-400 hover:text-red-500 border border-gray-200 hover:border-red-200 rounded-lg transition disabled:opacity-40 shrink-0"
+            >
+              {clearing ? '...' : 'Clear'}
+            </button>
+          )}
         </div>
       </div>
     </div>

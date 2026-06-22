@@ -23,6 +23,10 @@ class Session(db.Model):
     profile = db.relationship(
         "CompanyProfile", backref="session", uselist=False, cascade="all, delete-orphan"
     )
+    chat_messages = db.relationship(
+        "ChatHistory", backref="session", lazy=True, cascade="all, delete-orphan",
+        order_by="ChatHistory.created_at",
+    )
 
     def to_dict(self) -> dict:
         return {
@@ -291,6 +295,31 @@ class EligibilityCheck(db.Model):
             "missing": self.missing or [],
             "documents_required": self.documents_required or [],
             "recommendation": self.recommendation,
+            "created_at": self.created_at.isoformat(),
+        }
+
+
+class ChatHistory(db.Model):
+    __tablename__ = "chat_history"
+
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    session_id = db.Column(db.String(36), db.ForeignKey("sessions.id", ondelete="CASCADE"), nullable=False)
+    role = db.Column(db.String(20), nullable=False)   # 'user' | 'assistant'
+    content = db.Column(db.Text, nullable=False)
+    sources = db.Column(db.JSON, nullable=True)
+    confidence = db.Column(db.String(10), nullable=True)
+    created_at = db.Column(db.DateTime, default=_now)
+
+    __table_args__ = (db.Index("ix_chat_session", "session_id"),)
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "session_id": self.session_id,
+            "role": self.role,
+            "content": self.content,
+            "sources": self.sources,
+            "confidence": self.confidence,
             "created_at": self.created_at.isoformat(),
         }
 
