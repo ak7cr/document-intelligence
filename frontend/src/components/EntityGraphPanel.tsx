@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { fetchEntityGraph } from '../api/sessions'
 import type { EntityCluster } from '../types'
-import type { EntityCluster } from '../types'
 
 interface Props {
   sessionId: string
