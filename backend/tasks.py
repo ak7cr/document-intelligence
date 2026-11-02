@@ -3,7 +3,7 @@
 Two-phase pipeline:
   1. process_document  — download → OCR/extract → chunk → embed → index
                          Sets status="ready" so the doc is immediately searchable.
-  2. run_analysis      — LLM calls: entities + summary + prediction + checklist + eligibility
+  2. run_analysis      — LLM calls: entities + summary + checklist
                          Runs after phase 1; failures here don't affect searchability.
 """
 
@@ -14,17 +14,13 @@ from analyzer import analyze_document
 from celery_app import celery
 from checklist import build_checklist
 from chunker import chunk_text
-from eligibility import check_eligibility
 from models import (
-    CompanyProfile,
     Document,
     DocumentChunk,
     DocumentChecklist,
     DocumentEntity,
-    DocumentPrediction,
     DocumentSummary,
     DocumentText,
-    EligibilityCheck,
     db,
 )
 from processors import dispatch
@@ -198,7 +194,7 @@ def _analyse(task, doc_id: str) -> None:
 
     text = doc_text.raw_text
 
-    # ── Entities + summary + prediction (1 LLM call) ──────────────────────────
+    # ── Entities + summary (1 LLM call) ──────────────────────────────────────
     try:
         analysis = analyze_document(text)
 
@@ -228,29 +224,11 @@ def _analyse(task, doc_id: str) -> None:
                 key_points=analysis["key_points"],
             ))
 
-        pred_fields = {
-            "risk_level": analysis["risk_level"],
-            "confidence": analysis["confidence"],
-            "timeline_urgency": analysis["timeline_urgency"],
-            "risk_factors": analysis["risk_factors"],
-            "opportunities": analysis["opportunities"],
-            "recommended_actions": analysis["recommended_actions"],
-        }
-        existing_p = DocumentPrediction.query.filter_by(document_id=doc_id).first()
-        if existing_p:
-            for k, v in pred_fields.items():
-                setattr(existing_p, k, v)
-        else:
-            db.session.add(DocumentPrediction(document_id=doc_id, **pred_fields))
-
         db.session.commit()
-        logger.info(
-            "Analysis done for document %s — %d entities, risk=%s",
-            doc_id, len(analysis.get("entities", [])), analysis.get("risk_level"),
-        )
+        logger.info("Analysis done for document %s — %d entities", doc_id, len(analysis.get("entities", [])))
     except Exception:
         db.session.rollback()
-        logger.exception("Analysis (entities/summary/prediction) failed for document %s", doc_id)
+        logger.exception("Analysis (entities/summary) failed for document %s", doc_id)
 
     # ── Checklist ─────────────────────────────────────────────────────────────
     try:
@@ -265,26 +243,3 @@ def _analyse(task, doc_id: str) -> None:
     except Exception:
         db.session.rollback()
         logger.exception("Checklist failed for document %s", doc_id)
-
-    # ── Eligibility (only if profile exists) ──────────────────────────────────
-    try:
-        profile = CompanyProfile.query.filter_by(session_id=doc.session_id).first()
-        if profile:
-            elig_result = check_eligibility(text, profile.to_dict())
-            existing_e = EligibilityCheck.query.filter_by(document_id=doc_id).first()
-            if existing_e:
-                existing_e.profile_id = profile.id
-                existing_e.score = elig_result["score"]
-                existing_e.met = elig_result["met"]
-                existing_e.missing = elig_result["missing"]
-                existing_e.documents_required = elig_result["documents_required"]
-                existing_e.recommendation = elig_result["recommendation"]
-            else:
-                db.session.add(EligibilityCheck(
-                    document_id=doc_id, profile_id=profile.id, **elig_result
-                ))
-            db.session.commit()
-            logger.info("Eligibility done for document %s: score=%d", doc_id, elig_result["score"])
-    except Exception:
-        db.session.rollback()
-        logger.exception("Eligibility failed for document %s", doc_id)

@@ -20,9 +20,6 @@ class Session(db.Model):
     documents = db.relationship(
         "Document", backref="session", lazy=True, cascade="all, delete-orphan"
     )
-    profile = db.relationship(
-        "CompanyProfile", backref="session", uselist=False, cascade="all, delete-orphan"
-    )
     chat_messages = db.relationship(
         "ChatHistory", backref="session", lazy=True, cascade="all, delete-orphan",
         order_by="ChatHistory.created_at",
@@ -51,47 +48,20 @@ class Document(db.Model):
     uploaded_at = db.Column(db.DateTime, default=_now)
 
     text = db.relationship(
-        "DocumentText",
-        backref="document",
-        uselist=False,
-        cascade="all, delete-orphan",
+        "DocumentText", backref="document", uselist=False, cascade="all, delete-orphan",
     )
     chunks = db.relationship(
-        "DocumentChunk",
-        backref="document",
-        lazy=True,
-        cascade="all, delete-orphan",
+        "DocumentChunk", backref="document", lazy=True, cascade="all, delete-orphan",
         order_by="DocumentChunk.chunk_index",
     )
     entities = db.relationship(
-        "DocumentEntity",
-        backref="document",
-        lazy=True,
-        cascade="all, delete-orphan",
+        "DocumentEntity", backref="document", lazy=True, cascade="all, delete-orphan",
     )
     summary = db.relationship(
-        "DocumentSummary",
-        backref="document",
-        uselist=False,
-        cascade="all, delete-orphan",
-    )
-    prediction = db.relationship(
-        "DocumentPrediction",
-        backref="document",
-        uselist=False,
-        cascade="all, delete-orphan",
-    )
-    eligibility = db.relationship(
-        "EligibilityCheck",
-        backref="document",
-        uselist=False,
-        cascade="all, delete-orphan",
+        "DocumentSummary", backref="document", uselist=False, cascade="all, delete-orphan",
     )
     checklist = db.relationship(
-        "DocumentChecklist",
-        backref="document",
-        uselist=False,
-        cascade="all, delete-orphan",
+        "DocumentChecklist", backref="document", uselist=False, cascade="all, delete-orphan",
     )
 
     def to_dict(self) -> dict:
@@ -107,6 +77,7 @@ class Document(db.Model):
             "word_count": None,
             "page_count": None,
             "chunk_count": len(self.chunks),
+            "ocr_engine": None,
         }
         if self.text:
             data["word_count"] = self.text.word_count
@@ -120,17 +91,15 @@ class DocumentText(db.Model):
 
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     document_id = db.Column(
-        db.String(36),
-        db.ForeignKey("documents.id", ondelete="CASCADE"),
-        nullable=False,
-        unique=True,
+        db.String(36), db.ForeignKey("documents.id", ondelete="CASCADE"),
+        nullable=False, unique=True,
     )
     raw_text = db.Column(db.Text, nullable=False, default="")
     page_count = db.Column(db.Integer, nullable=True)
     word_count = db.Column(db.Integer, nullable=False, default=0)
-    method = db.Column(db.String(50), default="direct")  # 'direct' | 'ocr'
-    ocr_confidence = db.Column(db.Float, nullable=True)  # 0.0–1.0, None for direct
-    ocr_engine = db.Column(db.String(50), nullable=True)  # 'gemini' | 'easyocr' | 'tesseract' | '*:fallback'
+    method = db.Column(db.String(50), default="direct")
+    ocr_confidence = db.Column(db.Float, nullable=True)
+    ocr_engine = db.Column(db.String(50), nullable=True)
     extracted_at = db.Column(db.DateTime, default=_now)
 
     def to_dict(self) -> dict:
@@ -148,9 +117,7 @@ class DocumentChunk(db.Model):
 
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     document_id = db.Column(
-        db.String(36),
-        db.ForeignKey("documents.id", ondelete="CASCADE"),
-        nullable=False,
+        db.String(36), db.ForeignKey("documents.id", ondelete="CASCADE"), nullable=False,
     )
     chunk_index = db.Column(db.Integer, nullable=False)
     text = db.Column(db.Text, nullable=False)
@@ -172,46 +139,13 @@ class DocumentChunk(db.Model):
         }
 
 
-class DocumentPrediction(db.Model):
-    __tablename__ = "document_predictions"
-
-    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    document_id = db.Column(
-        db.String(36),
-        db.ForeignKey("documents.id", ondelete="CASCADE"),
-        nullable=False,
-        unique=True,
-    )
-    risk_level = db.Column(db.String(10), nullable=False, default="unknown")
-    confidence = db.Column(db.Float, nullable=False, default=0.0)
-    timeline_urgency = db.Column(db.Text, nullable=False, default="")
-    risk_factors = db.Column(db.JSON, nullable=False, default=list)
-    opportunities = db.Column(db.JSON, nullable=False, default=list)
-    recommended_actions = db.Column(db.JSON, nullable=False, default=list)
-    created_at = db.Column(db.DateTime, default=_now)
-
-    def to_dict(self) -> dict:
-        return {
-            "document_id": self.document_id,
-            "risk_level": self.risk_level,
-            "confidence": self.confidence,
-            "timeline_urgency": self.timeline_urgency,
-            "risk_factors": self.risk_factors or [],
-            "opportunities": self.opportunities or [],
-            "recommended_actions": self.recommended_actions or [],
-            "created_at": self.created_at.isoformat(),
-        }
-
-
 class DocumentSummary(db.Model):
     __tablename__ = "document_summaries"
 
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     document_id = db.Column(
-        db.String(36),
-        db.ForeignKey("documents.id", ondelete="CASCADE"),
-        nullable=False,
-        unique=True,
+        db.String(36), db.ForeignKey("documents.id", ondelete="CASCADE"),
+        nullable=False, unique=True,
     )
     headline = db.Column(db.Text, nullable=False, default="")
     summary_text = db.Column(db.Text, nullable=False, default="")
@@ -227,74 +161,22 @@ class DocumentSummary(db.Model):
         }
 
 
-class CompanyProfile(db.Model):
-    __tablename__ = "company_profiles"
-
-    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    session_id = db.Column(
-        db.String(36),
-        db.ForeignKey("sessions.id", ondelete="CASCADE"),
-        nullable=False,
-        unique=True,
-    )
-    company_name = db.Column(db.String(255), nullable=False, default="")
-    annual_turnover = db.Column(db.String(100), nullable=False, default="")
-    years_in_business = db.Column(db.Integer, nullable=True)
-    certifications = db.Column(db.JSON, nullable=False, default=list)
-    similar_projects = db.Column(db.Integer, nullable=True)
-    employee_count = db.Column(db.String(50), nullable=False, default="")
-    extra_details = db.Column(db.Text, nullable=False, default="")
-    created_at = db.Column(db.DateTime, default=_now)
-    updated_at = db.Column(db.DateTime, default=_now, onupdate=_now)
-
-    def to_dict(self) -> dict:
-        return {
-            "id": self.id,
-            "session_id": self.session_id,
-            "company_name": self.company_name,
-            "annual_turnover": self.annual_turnover,
-            "years_in_business": self.years_in_business,
-            "certifications": self.certifications or [],
-            "similar_projects": self.similar_projects,
-            "employee_count": self.employee_count,
-            "extra_details": self.extra_details,
-            "created_at": self.created_at.isoformat(),
-            "updated_at": self.updated_at.isoformat(),
-        }
-
-
-class EligibilityCheck(db.Model):
-    __tablename__ = "eligibility_checks"
+class DocumentChecklist(db.Model):
+    __tablename__ = "document_checklists"
 
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     document_id = db.Column(
-        db.String(36),
-        db.ForeignKey("documents.id", ondelete="CASCADE"),
-        nullable=False,
-        unique=True,
+        db.String(36), db.ForeignKey("documents.id", ondelete="CASCADE"),
+        nullable=False, unique=True,
     )
-    profile_id = db.Column(
-        db.String(36),
-        db.ForeignKey("company_profiles.id", ondelete="CASCADE"),
-        nullable=False,
-    )
-    score = db.Column(db.Integer, nullable=False, default=0)
-    met = db.Column(db.JSON, nullable=False, default=list)
-    missing = db.Column(db.JSON, nullable=False, default=list)
-    documents_required = db.Column(db.JSON, nullable=False, default=list)
-    recommendation = db.Column(db.Text, nullable=False, default="")
+    items = db.Column(db.JSON, nullable=False, default=list)
     created_at = db.Column(db.DateTime, default=_now)
 
     def to_dict(self) -> dict:
         return {
             "id": self.id,
             "document_id": self.document_id,
-            "profile_id": self.profile_id,
-            "score": self.score,
-            "met": self.met or [],
-            "missing": self.missing or [],
-            "documents_required": self.documents_required or [],
-            "recommendation": self.recommendation,
+            "items": self.items or [],
             "created_at": self.created_at.isoformat(),
         }
 
@@ -304,7 +186,7 @@ class ChatHistory(db.Model):
 
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     session_id = db.Column(db.String(36), db.ForeignKey("sessions.id", ondelete="CASCADE"), nullable=False)
-    role = db.Column(db.String(20), nullable=False)   # 'user' | 'assistant'
+    role = db.Column(db.String(20), nullable=False)
     content = db.Column(db.Text, nullable=False)
     sources = db.Column(db.JSON, nullable=True)
     confidence = db.Column(db.String(10), nullable=True)
@@ -324,36 +206,12 @@ class ChatHistory(db.Model):
         }
 
 
-class DocumentChecklist(db.Model):
-    __tablename__ = "document_checklists"
-
-    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    document_id = db.Column(
-        db.String(36),
-        db.ForeignKey("documents.id", ondelete="CASCADE"),
-        nullable=False,
-        unique=True,
-    )
-    items = db.Column(db.JSON, nullable=False, default=list)
-    created_at = db.Column(db.DateTime, default=_now)
-
-    def to_dict(self) -> dict:
-        return {
-            "id": self.id,
-            "document_id": self.document_id,
-            "items": self.items or [],
-            "created_at": self.created_at.isoformat(),
-        }
-
-
 class DocumentEntity(db.Model):
     __tablename__ = "document_entities"
 
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     document_id = db.Column(
-        db.String(36),
-        db.ForeignKey("documents.id", ondelete="CASCADE"),
-        nullable=False,
+        db.String(36), db.ForeignKey("documents.id", ondelete="CASCADE"), nullable=False,
     )
     entity_type = db.Column(db.String(50), nullable=False)
     label = db.Column(db.String(150), nullable=False)
