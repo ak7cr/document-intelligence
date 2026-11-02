@@ -7,16 +7,12 @@ import SearchPanel from './components/SearchPanel'
 import ChatPanel from './components/ChatPanel'
 import ComparePanel from './components/ComparePanel'
 import AnalyticsPanel from './components/AnalyticsPanel'
-import PredictionsPanel from './components/PredictionsPanel'
-import EligibilityPanel from './components/EligibilityPanel'
-import TimelinePanel from './components/TimelinePanel'
-import EntityGraphPanel from './components/EntityGraphPanel'
 import OcrReviewBanner from './components/OcrReviewBanner'
 import { fetchSessions } from './api/sessions'
 import { fetchOcrEngine, setOcrEngine, type OcrEngine } from './api/config'
 import { exportJson, exportCsv, exportXlsx } from './api/export'
 
-type Tab = 'documents' | 'chat' | 'compare' | 'analytics' | 'predictions' | 'eligibility' | 'timeline' | 'graph'
+type Tab = 'documents' | 'chat' | 'compare' | 'analytics'
 
 export default function App() {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
@@ -84,10 +80,6 @@ export default function App() {
                     <TabButton label="Chat" active={tab === 'chat'} onClick={() => setTab('chat')} />
                     <TabButton label="Compare" active={tab === 'compare'} onClick={() => setTab('compare')} />
                     <TabButton label="Analytics" active={tab === 'analytics'} onClick={() => setTab('analytics')} />
-                    <TabButton label="Predictions" active={tab === 'predictions'} onClick={() => setTab('predictions')} />
-                    <TabButton label="Eligibility" active={tab === 'eligibility'} onClick={() => setTab('eligibility')} />
-                    <TabButton label="Timeline" active={tab === 'timeline'} onClick={() => setTab('timeline')} />
-                    <TabButton label="Graph" active={tab === 'graph'} onClick={() => setTab('graph')} />
                   </div>
                 </div>
 
@@ -95,7 +87,7 @@ export default function App() {
                 <div className="flex items-center gap-2 mt-1 shrink-0">
                   {/* OCR engine selector — always visible */}
                   <div className="flex items-center gap-0.5 bg-gray-100 rounded-lg p-0.5">
-                    {(['gemini', 'easyocr', 'tesseract'] as OcrEngine[]).map((e) => (
+                    {(['claude', 'gemini', 'easyocr', 'tesseract'] as OcrEngine[]).map((e) => (
                       <button
                         key={e}
                         onClick={() => handleOcrChange(e)}
@@ -146,22 +138,6 @@ export default function App() {
             ) : tab === 'analytics' ? (
               <div className="flex-1 overflow-y-auto">
                 <AnalyticsPanel sessionId={activeSession.id} />
-              </div>
-            ) : tab === 'predictions' ? (
-              <div className="flex-1 overflow-y-auto">
-                <PredictionsPanel sessionId={activeSession.id} />
-              </div>
-            ) : tab === 'eligibility' ? (
-              <div className="flex-1 overflow-y-auto">
-                <EligibilityPanel sessionId={activeSession.id} />
-              </div>
-            ) : tab === 'timeline' ? (
-              <div className="flex-1 overflow-y-auto">
-                <TimelinePanel sessionId={activeSession.id} />
-              </div>
-            ) : tab === 'graph' ? (
-              <div className="flex-1 overflow-y-auto">
-                <EntityGraphPanel sessionId={activeSession.id} />
               </div>
             ) : (
               <div className="flex-1 overflow-y-auto p-8 space-y-6">

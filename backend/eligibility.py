@@ -5,6 +5,8 @@ import logging
 import os
 import re
 
+from llm.client import generate_json
+
 logger = logging.getLogger(__name__)
 
 MAX_TEXT_CHARS = 12_000
@@ -77,23 +79,12 @@ def check_eligibility(tender_text: str, profile: dict) -> dict:
         tender_text=tender_text[:MAX_TEXT_CHARS],
     )
 
-    provider = os.getenv("LLM_PROVIDER", "ollama")
     try:
-        raw = _call_gemini(prompt) if provider == "gemini" else _call_ollama(prompt)
+        raw = generate_json(prompt, _ELIG_SCHEMA, timeout=180)
         return _parse(raw)
     except Exception:
         logger.exception("Eligibility check LLM call failed")
         return _empty()
-
-
-def _call_gemini(prompt: str) -> str:
-    from google import genai
-    client = genai.Client(api_key=os.getenv("GEMINI_API_KEY", ""))
-    response = client.models.generate_content(
-        model=os.getenv("GEMINI_MODEL", "gemini-2.0-flash"),
-        contents=prompt,
-    )
-    return response.text.strip()
 
 
 _ELIG_SCHEMA = {
@@ -107,22 +98,6 @@ _ELIG_SCHEMA = {
     },
     "required": ["score", "met", "missing", "documents_required", "recommendation"],
 }
-
-
-def _call_ollama(prompt: str) -> str:
-    import requests
-    resp = requests.post(
-        f"{os.getenv('OLLAMA_HOST', 'http://localhost:11434')}/api/generate",
-        json={
-            "model": os.getenv("OLLAMA_MODEL", "llama3.2"),
-            "prompt": prompt,
-            "stream": False,
-            "format": _ELIG_SCHEMA,
-        },
-        timeout=180,
-    )
-    resp.raise_for_status()
-    return resp.json()["response"].strip()
 
 
 def _parse(raw: str) -> dict:

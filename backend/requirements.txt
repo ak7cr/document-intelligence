@@ -21,4 +21,5 @@ celery[redis]
 sentence-transformers
 qdrant-client
 google-genai
+anthropic
 ollama

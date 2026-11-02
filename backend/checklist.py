@@ -3,6 +3,8 @@ import logging
 import os
 import re
 
+from llm.client import generate_json
+
 logger = logging.getLogger(__name__)
 
 _CL_SCHEMA = {
@@ -15,22 +17,6 @@ _CL_SCHEMA = {
     },
     "required": ["items"],
 }
-
-
-def _call_llm(prompt: str) -> str:
-    provider = os.getenv("LLM_PROVIDER", "ollama")
-    if provider == "gemini":
-        from llm.client import generate
-        return generate(prompt)
-    import requests
-    resp = requests.post(
-        f"{os.getenv('OLLAMA_HOST', 'http://localhost:11434')}/api/generate",
-        json={"model": os.getenv("OLLAMA_MODEL", "llama3.2"), "prompt": prompt,
-              "stream": False, "format": _CL_SCHEMA},
-        timeout=180,
-    )
-    resp.raise_for_status()
-    return resp.json()["response"].strip()
 
 
 _VALID_CATS = {"Technical", "Financial", "Legal", "Administrative"}
@@ -64,7 +50,7 @@ TENDER DOCUMENT:
 """
 
     try:
-        raw = _call_llm(prompt)
+        raw = generate_json(prompt, _CL_SCHEMA, timeout=180)
         text = raw.strip()
         fence = re.search(r"```(?:json)?\s*([\s\S]*?)```", text)
         if fence:

@@ -1,5 +1,7 @@
 """OCR dispatcher — selects backend based on OCR_ENGINE env var.
 
+OCR_ENGINE=gemini                Gemini Vision — best quality, 1 call/page
+OCR_ENGINE=claude                Claude Vision — best quality, 1 call/page
 OCR_ENGINE=easyocr   (default) GPU-accelerated, good Hindi accuracy, ~100 MB download
 OCR_ENGINE=tesseract             CPU-only, no download, needs system packages:
                                  apt-get install tesseract-ocr tesseract-ocr-hin tesseract-ocr-eng
@@ -124,6 +126,11 @@ def ocr_image(img_bytes: bytes) -> tuple[str, float, str]:
     from config import get_ocr_engine
     engine = get_ocr_engine()
 
+    if engine == "claude":
+        from .claude_engine import ocr_image_claude
+        text, conf, used = ocr_image_claude(img_bytes)
+        return text, conf, used
+
     if engine == "gemini":
         from .gemini_engine import ocr_image_gemini
         text, conf, used = ocr_image_gemini(img_bytes)
@@ -158,3 +165,36 @@ def ocr_image(img_bytes: bytes) -> tuple[str, float, str]:
 
     avg_confidence = sum(all_scores) / len(all_scores) if all_scores else 0.0
     return "\n".join(all_texts), avg_confidence, "easyocr"
+
+
+def local_fallback_ocr(img_bytes: bytes) -> tuple[str, float, str]:
+    """EasyOCR → Tesseract fallback for the cloud OCR engines (gemini/claude).
+
+    Returns (text, confidence, engine_used) with engine_used ending in
+    ':fallback', or ('', 0.0, 'none:failed') when everything fails.
+    """
+    try:
+        reader = _get_reader()
+        img_array = np.array(Image.open(io.BytesIO(img_bytes)).convert("RGB"))
+        all_texts: list[str] = []
+        all_scores: list[float] = []
+        for strip in _tile(img_array):
+            kept = _ocr_strip(reader, strip)
+            all_texts.extend(t for t, _ in kept)
+            all_scores.extend(s for _, s in kept)
+        text = "\n".join(all_texts)
+        if text.strip():
+            conf = sum(all_scores) / len(all_scores) if all_scores else 0.0
+            logger.info("EasyOCR fallback succeeded")
+            return text, conf, "easyocr:fallback"
+    except Exception as exc:
+        logger.warning("EasyOCR fallback failed: %s — trying Tesseract", exc)
+
+    try:
+        from .tesseract_engine import ocr_image_tesseract
+        text, conf = ocr_image_tesseract(img_bytes)
+        logger.info("Tesseract fallback succeeded")
+        return text, conf, "tesseract:fallback"
+    except Exception as exc:
+        logger.error("Tesseract fallback also failed: %s", exc)
+        return "", 0.0, "none:failed"

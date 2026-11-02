@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { AnalyticsResult, ComparisonResult, Document, DocumentChecklist, DocumentEntity, DocumentPrediction, DocumentSummary, EligibilityCheck } from '../types'
+import type { AnalyticsResult, ComparisonResult, Document, DocumentEntity, DocumentSummary } from '../types'
 
 export async function fetchDocuments(sessionId: string): Promise<Document[]> {
   const res = await apiClient.get<Document[]>(`/documents/${sessionId}`)
@@ -49,16 +49,6 @@ export async function resummarizeDocument(id: string): Promise<DocumentSummary> 
   return res.data
 }
 
-export async function fetchPrediction(docId: string): Promise<DocumentPrediction> {
-  const res = await apiClient.get<DocumentPrediction>(`/documents/${docId}/prediction`)
-  return res.data
-}
-
-export async function runPrediction(docId: string): Promise<DocumentPrediction> {
-  const res = await apiClient.post<DocumentPrediction>(`/documents/${docId}/predict`)
-  return res.data
-}
-
 export async function fetchAnalytics(sessionId: string): Promise<AnalyticsResult> {
   const res = await apiClient.get<AnalyticsResult>(`/sessions/${sessionId}/analytics`)
   return res.data
@@ -68,25 +58,5 @@ export async function compareDocuments(sessionId: string, docIds: string[]): Pro
   const res = await apiClient.post<ComparisonResult>(`/sessions/${sessionId}/compare`, {
     doc_ids: docIds,
   })
-  return res.data
-}
-
-export async function fetchEligibility(docId: string): Promise<EligibilityCheck> {
-  const res = await apiClient.get<EligibilityCheck>(`/documents/${docId}/eligibility`)
-  return res.data
-}
-
-export async function runEligibility(docId: string): Promise<EligibilityCheck> {
-  const res = await apiClient.post<EligibilityCheck>(`/documents/${docId}/eligibility`)
-  return res.data
-}
-
-export async function fetchChecklist(docId: string): Promise<DocumentChecklist> {
-  const res = await apiClient.get<DocumentChecklist>(`/documents/${docId}/checklist`)
-  return res.data
-}
-
-export async function runChecklist(docId: string): Promise<DocumentChecklist> {
-  const res = await apiClient.post<DocumentChecklist>(`/documents/${docId}/checklist`)
   return res.data
 }

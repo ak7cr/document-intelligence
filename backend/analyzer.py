@@ -10,6 +10,8 @@ import logging
 import os
 import re
 
+from llm.client import generate_json
+
 logger = logging.getLogger(__name__)
 
 MAX_CHARS = 14_000
@@ -51,27 +53,16 @@ def analyze_document(text: str) -> dict:
     empty/default values for any section that fails to parse.
     """
     prompt = _PROMPT.format(text=text[:MAX_CHARS])
-    provider = os.getenv("LLM_PROVIDER", "ollama")
 
     try:
-        raw = _call_gemini(prompt) if provider == "gemini" else _call_ollama(prompt)
+        raw = generate_json(prompt, _SCHEMA, timeout=180)
         return _parse(raw)
     except Exception:
         logger.exception("Combined document analysis LLM call failed")
         return _empty()
 
 
-def _call_gemini(prompt: str) -> str:
-    from google import genai
-    client = genai.Client(api_key=os.getenv("GEMINI_API_KEY", ""))
-    response = client.models.generate_content(
-        model=os.getenv("GEMINI_MODEL", "gemini-2.0-flash"),
-        contents=prompt,
-    )
-    return response.text.strip()
-
-
-_OLLAMA_SCHEMA = {
+_SCHEMA = {
     "type": "object",
     "properties": {
         "doc_type":            {"type": "string"},
@@ -90,22 +81,6 @@ _OLLAMA_SCHEMA = {
                  "risk_level", "confidence", "timeline_urgency", "risk_factors",
                  "opportunities", "recommended_actions"],
 }
-
-
-def _call_ollama(prompt: str) -> str:
-    import requests
-    resp = requests.post(
-        f"{os.getenv('OLLAMA_HOST', 'http://localhost:11434')}/api/generate",
-        json={
-            "model": os.getenv("OLLAMA_MODEL", "llama3.2"),
-            "prompt": prompt,
-            "stream": False,
-            "format": _OLLAMA_SCHEMA,  # constrained decoding — model CANNOT deviate from schema
-        },
-        timeout=180,
-    )
-    resp.raise_for_status()
-    return resp.json()["response"].strip()
 
 
 def _repair(text: str) -> str:

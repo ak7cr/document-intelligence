@@ -1,6 +1,6 @@
 import { apiClient } from './client'
 
-export type OcrEngine = 'gemini' | 'easyocr' | 'tesseract'
+export type OcrEngine = 'gemini' | 'claude' | 'easyocr' | 'tesseract'
 
 export async function fetchOcrEngine(): Promise<OcrEngine> {
   const res = await apiClient.get<{ ocr_engine: OcrEngine }>('/config/ocr-engine')

@@ -52,17 +52,6 @@ export interface DocumentEntity {
   value: string
 }
 
-export interface DocumentPrediction {
-  document_id: string
-  risk_level: 'low' | 'medium' | 'high' | 'unknown'
-  confidence: number
-  timeline_urgency: string
-  risk_factors: string[]
-  opportunities: string[]
-  recommended_actions: string[]
-  created_at: string
-}
-
 export interface AnalyticsTotals {
   documents: number
   ready: number
@@ -111,37 +100,6 @@ export interface ComparisonResult {
   analysis: ComparisonAnalysis
 }
 
-export interface CompanyProfile {
-  id: string
-  session_id: string
-  company_name: string
-  annual_turnover: string
-  years_in_business: number | null
-  certifications: string[]
-  similar_projects: number | null
-  employee_count: string
-  extra_details: string
-  created_at: string
-  updated_at: string
-}
-
-export interface EligibilityDocRequired {
-  name: string
-  status: 'available' | 'required'
-}
-
-export interface EligibilityCheck {
-  id: string
-  document_id: string
-  profile_id: string
-  score: number
-  met: string[]
-  missing: string[]
-  documents_required: EligibilityDocRequired[]
-  recommendation: string
-  created_at: string
-}
-
 export interface OcrReviewItem {
   document_id: string
   filename: string
@@ -149,51 +107,6 @@ export interface OcrReviewItem {
   ocr_confidence: number | null
   page_count: number | null
   word_count: number | null
-}
-
-export interface EntityClusterDoc {
-  id: string
-  filename: string
-  label: string
-}
-
-export interface EntityCluster {
-  entity_type: string
-  value: string
-  doc_count: number
-  documents: EntityClusterDoc[]
-}
-
-export interface EntityGraph {
-  session_id: string
-  clusters: EntityCluster[]
-  total_shared: number
-}
-
-export interface ChecklistItem {
-  name: string
-  category: 'Technical' | 'Financial' | 'Legal' | 'Administrative'
-  status: 'required' | 'optional'
-  notes: string
-}
-
-export interface DocumentChecklist {
-  id: string
-  document_id: string
-  items: ChecklistItem[]
-  created_at: string
-}
-
-export interface TimelineItem {
-  entity_id: string
-  document_id: string
-  filename: string
-  label: string
-  value: string
-  entity_type: string
-  parsed_date: string | null
-  days_from_now: number | null
-  urgency: 'past' | 'critical' | 'soon' | 'future' | 'unknown'
 }
 
 export interface ChatSource {

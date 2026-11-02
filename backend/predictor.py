@@ -5,6 +5,8 @@ import logging
 import os
 import re
 
+from llm.client import generate_json
+
 logger = logging.getLogger(__name__)
 
 MAX_TEXT_CHARS = 10_000
@@ -71,9 +73,8 @@ def predict_document(doc_id: str) -> dict:
     context = "\n\n".join(context_parts)
     prompt = _PROMPT.format(context=context)
 
-    provider = os.getenv("LLM_PROVIDER", "ollama")
     try:
-        raw = _call_gemini(prompt) if provider == "gemini" else _call_ollama(prompt)
+        raw = generate_json(prompt, timeout=120)
         return _parse(raw)
     except Exception:
         logger.exception("Prediction LLM call failed for document %s", doc_id)
@@ -85,27 +86,6 @@ def predict_document(doc_id: str) -> dict:
             "opportunities": [],
             "recommended_actions": [],
         }
-
-
-def _call_gemini(prompt: str) -> str:
-    from google import genai
-    client = genai.Client(api_key=os.getenv("GEMINI_API_KEY", ""))
-    response = client.models.generate_content(
-        model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
-        contents=prompt,
-    )
-    return response.text.strip()
-
-
-def _call_ollama(prompt: str) -> str:
-    import requests
-    resp = requests.post(
-        f"{os.getenv('OLLAMA_HOST', 'http://localhost:11434')}/api/generate",
-        json={"model": os.getenv("OLLAMA_MODEL", "llama3.2"), "prompt": prompt, "stream": False},
-        timeout=120,
-    )
-    resp.raise_for_status()
-    return resp.json()["response"].strip()
 
 
 def _parse(raw: str) -> dict:
